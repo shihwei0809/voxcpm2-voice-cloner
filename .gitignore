@@ -10,10 +10,13 @@ pretrained_models/
 *.safetensors
 *.pth
 
-# 音檔（使用者個人資料，不進 repo）
+# 音檔（含 voices/ 內的參考音，屬個人資料不進版控）
 ref_voice.wav
 *.wav
 output/
+
+# 聲音資料夾（每個人的參考音與逐字稿，本地保留但不進版控）
+voices/
 
 # GPU 類型標記
 .gpu_type

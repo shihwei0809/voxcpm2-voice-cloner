@@ -20,6 +20,19 @@
 - 約 5GB 硬碟空間（模型權重）
 - 麥克風
 
+## 聲音錄製
+
+本專案不含預設聲音，請先錄製你自己的參考音：
+
+```powershell
+.\.venv\Scripts\python.exe record.py --voice 我的聲音
+```
+
+螢幕會顯示一段文字，請對著麥克風自然地朗讀。錄完會存到 `voices/我的聲音/`（本地保留，不進版控）。
+
+> 你念的文字就是逐字稿，不需要額外做語音辨識。
+> `voices/` 目錄已從版控排除，參考音屬個人資料不會推上 GitHub。
+
 ## 快速開始
 
 ### 1. 安裝
@@ -40,17 +53,15 @@ cd voxcpm2-voice-cloner
 ### 2. 錄製參考音
 
 ```powershell
-.\.venv\Scripts\python.exe record.py
+.\.venv\Scripts\python.exe record.py --voice 我的聲音
 ```
 
-螢幕會顯示一段文字，請對著麥克風自然地朗讀。錄完會存成 `ref_voice.wav`。
-
-> 你念的文字就是逐字稿，不需要額外做語音辨識。
+螢幕會顯示一段文字，請對著麥克風自然地朗讀。錄完會存到 `voices/我的聲音/`。
 
 ### 3. 生成克隆語音
 
 ```powershell
-.\.venv\Scripts\python.exe clone.py "你好，這是我的克隆聲音。"
+.\.venv\Scripts\python.exe clone.py "你好，這是我的克隆聲音。" --voice 我的聲音
 ```
 
 或從文字檔生成：
@@ -70,11 +81,14 @@ voxcpm2-voice-cloner/
 ├── clone.py                 # Ultimate Cloning 語音生成
 ├── texts/
 │   └── sample_text.txt      # 給使用者朗讀的範例文字
+├── voices/                  # 聲音資料夾（.gitignore 排除，本地保留）
+│   └── <你的聲音>/          # 用 record.py 建立
+│       ├── ref_voice.wav    # 參考音
+│       └── prompt.txt       # 逐字稿
 ├── patches/
 │   ├── utils.py             # XPU device 支援 patch（Intel Arc 用）
 │   └── repatch_xpu.ps1      # voxcpm 更新後自動重 patch
 ├── output/                  # 生成的語音輸出於此
-├── ref_voice.wav            # 錄音後產生（.gitignore 排除）
 └── .gpu_type                # 安裝時記錄的 GPU 類型（.gitignore 排除）
 ```
 

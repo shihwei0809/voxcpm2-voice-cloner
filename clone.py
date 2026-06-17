@@ -2,12 +2,14 @@
 """
 clone.py - 用 VoxCPM2 Ultimate Cloning 生成你的克隆語音。
 
-需要先執行 record.py 錄製參考音。
+預設使用「三師爸」聲音。也可以用 --voice 指定其他聲音，或用 --reference/--text-file 自訂。
 
 用法：
   python clone.py "你好，這是我的克隆聲音。"
+  python clone.py "文字" --voice 三師爸
   python clone.py --file my_script.txt
   python clone.py "文字" --output output/my_voice.wav
+  python clone.py "文字" --reference my_ref.wav --text-file my_ref_text.txt
 """
 
 import os
@@ -15,9 +17,11 @@ import sys
 import time
 import argparse
 
+REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+
 def detect_device():
     """從 install.ps1 產生的 .gpu_type 讀取，或自動偵測。"""
-    gpu_type_file = os.path.join(os.path.dirname(__file__), '.gpu_type')
+    gpu_type_file = os.path.join(REPO_DIR, '.gpu_type')
     if os.path.exists(gpu_type_file):
         with open(gpu_type_file, 'r', encoding='utf-8') as f:
             gpu_type = f.read().strip()
@@ -34,16 +38,26 @@ def detect_device():
     return device_map.get(gpu_type, 'cpu')
 
 
+def resolve_voice_files(voice, reference_override, text_override):
+    """根據 voice 名稱解析參考音和逐字稿路徑。"""
+    voice_dir = os.path.join(REPO_DIR, 'voices', voice)
+    reference = reference_override or os.path.join(voice_dir, 'ref_voice.wav')
+    text_file = text_override or os.path.join(voice_dir, 'prompt.txt')
+    return reference, text_file
+
+
 def main():
     parser = argparse.ArgumentParser(description='VoxCPM2 Ultimate Cloning 語音生成')
     parser.add_argument('text', nargs='?', help='要生成的文字')
     parser.add_argument('--file', '-f', help='從文字檔讀取要生成的內容')
     parser.add_argument('--output', '-o', default='output/cloned_voice.wav',
                         help='輸出檔案路徑（預設: output/cloned_voice.wav）')
-    parser.add_argument('--reference', '-r', default='ref_voice.wav',
-                        help='參考音檔路徑（預設: ref_voice.wav）')
-    parser.add_argument('--text-file', '-t', default='texts/sample_text.txt',
-                        help='參考音的逐字稿檔案（預設: texts/sample_text.txt）')
+    parser.add_argument('--voice', '-v', default='三師爸',
+                        help='聲音名稱，對應 voices/ 目錄（預設: 三師爸）')
+    parser.add_argument('--reference', '-r',
+                        help='覆蓋參考音檔路徑（預設由 --voice 決定）')
+    parser.add_argument('--text-file', '-t',
+                        help='覆蓋逐字稿檔案路徑（預設由 --voice 決定）')
     parser.add_argument('--device', '-d', help='強制指定裝置 (cuda/xpu/cpu)')
     args = parser.parse_args()
 
@@ -58,17 +72,21 @@ def main():
         print('範例: python clone.py "你好，這是我的克隆聲音。"')
         sys.exit(1)
 
+    # 根據 voice 名稱解析參考音和逐字稿
+    reference, text_file = resolve_voice_files(args.voice, args.reference, args.text_file)
+
     # 檢查參考音檔
-    if not os.path.exists(args.reference):
-        print(f'錯誤：找不到參考音檔 {args.reference}')
-        print('請先執行: python record.py')
+    if not os.path.exists(reference):
+        print(f'錯誤：找不到參考音檔 {reference}')
+        if args.voice:
+            print(f'請先錄製「{args.voice}」聲音: python record.py --voice {args.voice}')
         sys.exit(1)
 
     # 讀取逐字稿
-    if not os.path.exists(args.text_file):
-        print(f'錯誤：找不到逐字稿檔案 {args.text_file}')
+    if not os.path.exists(text_file):
+        print(f'錯誤：找不到逐字稿檔案 {text_file}')
         sys.exit(1)
-    with open(args.text_file, 'r', encoding='utf-8') as f:
+    with open(text_file, 'r', encoding='utf-8') as f:
         prompt_text = f.read().strip()
 
     # 偵測裝置
@@ -78,6 +96,7 @@ def main():
     from voxcpm import VoxCPM
     import soundfile as sf
 
+    print(f'聲音: {args.voice}')
     print(f'裝置: {device}')
     print('載入 VoxCPM2 模型（首次會下載權重，約 4.7GB）...')
     t0 = time.time()
@@ -94,9 +113,9 @@ def main():
     t1 = time.time()
     wav = model.generate(
         text=gen_text,
-        prompt_wav_path=args.reference,
+        prompt_wav_path=reference,
         prompt_text=prompt_text,
-        reference_wav_path=args.reference,
+        reference_wav_path=reference,
         cfg_value=2.0,
         inference_timesteps=10,
     )
