@@ -1,12 +1,15 @@
 # VoxCPM2 Voice Cloner
 
-用 VoxCPM2 克隆你的聲音，生成任意語音。全自動安裝，自動偵測 GPU，**一個網頁搞定全部流程**。
+用 VoxCPM2 克隆你的聲音，生成任意語音。全自動安裝，自動偵測 GPU。
+
+**錄音走 UI，其他全部透過 AI Agent 自然語言操作。**
 
 ## 特色
 
 - **自動偵測 GPU**：NVIDIA CUDA / Intel Arc XPU / CPU 三種模式自動切換
 - ** Ultimate Cloning**：同時使用參考音 + 逐字稿，連語氣節奏都一起複製
-- **網頁操作**：`app.py` 提供完整網頁介面（錄音 → 克隆 → 生成 → 對話），瀏覽器開網址就能用
+- **網頁錄音**：`app.py` 提供簡潔錄音介面（取名 → 看稿 → 錄音 → 儲存）
+- **自然語言操作**：錄完後，直接對 AI Agent 說「用王老師的聲音說一段話」，Agent 自動呼叫工具
 - **Apache-2.0 授權**：VoxCPM2 模型可商用
 
 ## 系統需求
@@ -20,38 +23,27 @@
 - 約 5GB 硬碟空間（模型權重）
 - 麥克風
 
-## 快速開始（三步）
+## 快速開始（雙擊即可）
 
 ### 1. 安裝
 
-```powershell
-git clone https://github.com/mathruffian-dot/voxcpm2-voice-cloner.git
-cd voxcpm2-voice-cloner
-.\install.ps1
+雙擊 `install.bat`（或 `install.ps1`）。自動完成所有設定。
+
+### 2. 錄音
+
+雙擊 `start.bat` → 瀏覽器打開 → 取名 → 對著麥克風念稿 → 儲存。
+
+### 3. 使用（透過 AI Agent）
+
+錄完後，直接對 AI Agent 說：
+
+```
+用王老師的聲音說「同學們早安，今天我們來上數學課」
 ```
 
-安裝腳本自動完成：Python 3.12 venv / GPU 偵測 / PyTorch / voxcpm / XPU patch（若需要）
+Agent 會自動找到對應聲音、生成語音、回傳音檔。
 
-### 2. 啟動網頁工具
-
-```powershell
-.\.venv\Scripts\python.exe app.py
-```
-
-瀏覽器打開 `http://127.0.0.1:7860`，三個分頁：
-
-| 分頁 | 功能 |
-|------|------|
-| 🎙️ 錄音 | 輸入聲音名稱 → 麥克風錄音（或上傳音檔）→ 存檔 |
-| 🔊 生成 | 選聲音 → 輸入文字 → 生成克隆語音 → 播放/下載 |
-| 💬 對話 | 選兩個聲音 → 寫對話腳本 → 生成多人對話 |
-
-### 3. 使用流程
-
-1. 切到「🎙️ 錄音」分頁 → 輸入聲音名稱 → 對著麥克風朗讀文字 → 存檔
-2. 切到「🔊 生成」分頁 → 選擇聲音 → 輸入文字 → 按生成 → 播放
-
-> 💡 如果瀏覽器找不到麥克風，可以先用 `record.py` 命令列錄音，再用網頁「上傳音檔」。
+> 💡 本專案設計為 **AI Agent 工具包**，人類只做錄音，其他交給 Agent。
 5. 若為 Intel Arc，自動套用 XPU patch
 
 ### 2. 錄製參考音
@@ -92,23 +84,18 @@ cd voxcpm2-voice-cloner
 
 ```
 voxcpm2-voice-cloner/
-├── app.py                    # 主程式：網頁工具（錄音 + 克隆 + 對話）
-├── install.ps1               # 自動安裝腳本（偵測 GPU + 建環境）
-├── webui_record.py           # 獨立錄音介面（Gradio，替代方案）
-├── record.py                 # 命令列錄音（替代方案）
-├── clone.py                  # 命令列語音生成（替代方案）
-├── dialogue.py               # 命令列對話生成（替代方案）
-├── texts/
-│   └── sample_text.txt       # 給使用者朗讀的範例文字
-├── voices/                   # 聲音資料夾（.gitignore 排除，本地保留）
-│   └── <你的聲音>/           # 用 app.py 錄音時自動建立
-│       ├── ref_voice.wav     # 參考音
-│       └── prompt.txt        # 逐字稿
-├── patches/
-│   ├── utils.py              # XPU device 支援 patch（Intel Arc 用）
-│   └── repatch_xpu.ps1       # voxcpm 更新後自動重 patch
-├── output/                   # 生成的語音輸出於此
-└── .gpu_type                 # 安裝時記錄的 GPU 類型（.gitignore 排除）
+├── app.py                    # 錄音 UI（唯一介面）
+├── clone.py                  # Agent 工具：用聲音生成語音
+├── dialogue.py               # Agent 工具：多聲音對話
+├── record.py                 # 命令列錄音（備案）
+├── start.bat                 # 雙擊啟動錄音 UI
+├── install.bat               # 雙擊安裝
+├── install.ps1               # 自動偵測 GPU + 安裝依賴
+├── AGENTS.md                 # Agent 使用指南
+├── texts/sample_text.txt     # 錄音時朗讀的文字
+├── voices/                   # 已錄製的聲音（本地，不進版控）
+├── patches/                  # Intel Arc XPU 支援
+└── output/                   # 生成的語音
 ```
 
 ## 命令列工具（替代方案，不需 GUI 時可用）
