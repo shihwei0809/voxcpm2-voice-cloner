@@ -41,7 +41,7 @@ start "VoxCPM2 Server" ".venv\Scripts\python.exe" app.py
 :: ========== 等待伺服器啟動 ==========
 echo 等待伺服器啟動中...
 :wait
-timeout /t 1 /nobreak >nul
+ping 127.0.0.1 -n 2 >nul
 curl -s http://127.0.0.1:7860 >nul 2>&1
 if errorlevel 1 goto wait
 
@@ -52,4 +52,4 @@ start http://127.0.0.1:7860
 echo.
 echo 視窗可以關閉，伺服器會在背景持續執行。
 echo 若要停止，按 Ctrl+C 或關閉「VoxCPM2 Server」視窗。
-timeout /t 5 >nul
+ping 127.0.0.1 -n 6 >nul

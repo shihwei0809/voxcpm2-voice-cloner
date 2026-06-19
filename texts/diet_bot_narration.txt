@@ -1,0 +1,1 @@
+大家好，我是小偉。今天為大家介紹『LINE 飲食熱量精算師』的建置手冊。本手冊引導開發者整合 LINE Messaging API、Google Apps Script 與 Gemini 2.5 旗艦版 AI，打造飲食管理機器人。使用者只需傳送食物照片，系統即會透過 AI 自動辨識、計算熱量與三大營養素，並寫入 Google 試算表。建置分為三個步驟：第一、在 LINE Developers 後台建立通道並獲取金鑰；第二、建立 Google 試算表並部署 GAS 網頁應用程式；第三、將網頁 URL 綁定為 Webhook 並完成測試。內建防呆與修復功能，讓您輕鬆打造個人飲食健康助手。
