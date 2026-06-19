@@ -186,6 +186,18 @@ def load_history_audio(filename):
     return None
 
 
+def get_presentation_iframe():
+    path = os.path.join(REPO_DIR, "summary_presentation.html")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+            html_content = html_content.replace('src="output/', 'src="file=output/')
+            import html
+            escaped_html = html.escape(html_content)
+            return f'<iframe srcdoc="{escaped_html}" style="width:100%; height:720px; border:none; border-radius:16px;"></iframe>'
+    return "<div style='padding:20px; text-align:center; color:#ef4444;'>⚠️ 找不到簡報播放器檔案 (summary_presentation.html)。</div>"
+
+
 def on_save(audio_mic, audio_upload, voice_name):
     audio_data = audio_mic or audio_upload
     if audio_data is None:
@@ -230,41 +242,43 @@ def on_save(audio_mic, audio_upload, voice_name):
 def build_ui():
     sample_text = load_sample_text()
 
-    with gr.Blocks(title="VoxCPM2 錄音工具", css=CUSTOM_CSS) as app:
+    with gr.Blocks(title="VoxCPM2 語音與簡報工具", css=CUSTOM_CSS) as app:
         gr.HTML("""
         <div style="text-align:center; margin-bottom:24px;">
-          <h1 class="main-title">🎙️ VoxCPM2 語音錄製</h1>
-          <p class="main-subtitle">錄下你的聲音，後續由 AI 幫你生成任何語音。</p>
+          <h1 class="main-title">🎙️ VoxCPM2 語音與簡報工具</h1>
+          <p class="main-subtitle">在此錄製您的參考聲音、管理音庫，並以互動式網報同步播放您的專案簡報與克隆配音。</p>
         </div>
         """)
 
-        with gr.Column(elem_classes="step-box"):
-            gr.Markdown("## ✏️ 為聲音取名字")
-            voice_name_input = gr.Textbox(
-                label="",
-                placeholder="例如：王老師、林主任...",
-                show_label=False,
-            )
+        with gr.Tabs():
+            with gr.Tab("🎙️ 聲音錄製與庫管理"):
+                with gr.Column(elem_classes="step-box"):
+                    gr.Markdown("## ✏️ 為聲音取名字")
+                    voice_name_input = gr.Textbox(
+                        label="",
+                        placeholder="例如：王老師、林主任...",
+                        show_label=False,
+                    )
 
-        with gr.Column(elem_classes="step-box"):
-            gr.Markdown("## 📖 請念這段文字")
-            gr.HTML(
-                f'<div class="sample-text-box">{sample_text}</div>'
-            )
+                with gr.Column(elem_classes="step-box"):
+                    gr.Markdown("## 📖 請念這段文字")
+                    gr.HTML(
+                        f'<div class="sample-text-box">{sample_text}</div>'
+                    )
 
-        with gr.Column(elem_classes="step-box"):
-            gr.Markdown("## 🎤 錄音並儲存")
-            audio_mic = gr.Audio(label="", type="numpy", sources=["microphone"], show_label=False)
+                with gr.Column(elem_classes="step-box"):
+                    gr.Markdown("## 🎤 錄音並儲存")
+                    audio_mic = gr.Audio(label="", type="numpy", sources=["microphone"], show_label=False)
 
-            gr.HTML('<div class="hint-text">👆 錄完後按這裡儲存 👇</div>')
+                    gr.HTML('<div class="hint-text">👆 錄完後按這裡儲存 👇</div>')
 
-            with gr.Row():
-                save_btn = gr.Button("⬇️ 儲存聲音", variant="primary", size="lg")
+                    with gr.Row():
+                        save_btn = gr.Button("⬇️ 儲存聲音", variant="primary", size="lg")
 
-            with gr.Accordion("或上傳已錄好的音檔", open=False):
-                audio_upload = gr.Audio(label="", type="numpy", sources=["upload"], show_label=False)
+                    with gr.Accordion("或上傳已錄好的音檔", open=False):
+                        audio_upload = gr.Audio(label="", type="numpy", sources=["upload"], show_label=False)
 
-        save_msg = gr.Textbox(label="", show_label=False, lines=5, interactive=False)
+                save_msg = gr.Textbox(label="", show_label=False, lines=5, interactive=False)
 
         with gr.Column(elem_classes="step-box"):
             gr.Markdown("## 🎙️ 已錄製的參考聲音 (本機聲音庫)")
@@ -373,6 +387,9 @@ def build_ui():
             fn=on_refresh,
             outputs=[history_dropdown, history_audio]
         )
+
+            with gr.Tab("📊 互動式簡報播放"):
+                gr.HTML(get_presentation_iframe())
 
         gr.HTML("""
         <div class="footer-text">

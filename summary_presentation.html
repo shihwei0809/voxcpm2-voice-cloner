@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>Shihwei's AI Agent 專案大綱與進度簡報</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-sub: #cbd5e1;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --border-color: #334155;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft JhengHei', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    
+    .presentation-container {
+      width: 90%;
+      max-width: 960px;
+      height: 600px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    
+    .slides-wrapper {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      padding: 40px;
+    }
+    
+    .slide-card {
+      position: absolute;
+      top: 40px;
+      left: 40px;
+      right: 40px;
+      bottom: 40px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    
+    .slide-card.active {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    
+    .slide-header {
+      font-size: 1.5em;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .slide-title {
+      font-size: 2.8em;
+      font-weight: 800;
+      margin-bottom: 24px;
+      line-height: 1.2;
+    }
+    
+    .slide-meta {
+      font-size: 1.1em;
+      color: #64748b;
+    }
+    
+    .slide-bullets {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .slide-bullets li {
+      font-size: 1.2em;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      position: relative;
+      padding-left: 24px;
+      color: var(--text-sub);
+    }
+    
+    .slide-bullets li::before {
+      content: "•";
+      color: var(--accent);
+      font-size: 1.5em;
+      position: absolute;
+      left: 0;
+      top: -2px;
+    }
+    
+    .slide-bullets strong {
+      color: var(--text-main);
+    }
+    
+    .controls-wrapper {
+      background: rgba(15, 23, 42, 0.6);
+      border-top: 1px solid var(--border-color);
+      padding: 20px 40px;
+      border-radius: 0 0 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    .audio-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    
+    audio {
+      flex: 1;
+      height: 40px;
+      border-radius: 8px;
+    }
+    
+    .navigation-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    
+    .nav-btn {
+      background: #334155;
+      color: var(--text-main);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95em;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    
+    .nav-btn.active {
+      background: var(--accent);
+    }
+    
+    .nav-btn:hover {
+      background: var(--accent-hover);
+    }
+    
+    .keyboard-hint {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 0.85em;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="presentation-container">
+    <div class="slides-wrapper">
+      <!-- Slide 1 -->
+      <div class="slide-card active" id="slide-1">
+        <div class="slide-header">Shihwei's AI Agent</div>
+        <div class="slide-title">個人專案總覽與進度報告</div>
+        <div class="slide-meta">報告人：AI 語音助理 小偉 | 時間：2026年6月</div>
+      </div>
+      
+      <!-- Slide 2 -->
+      <div class="slide-card" id="slide-2">
+        <div class="slide-header">01. 製程與安全培訓專案</div>
+        <ul class="slide-bullets">
+          <li><strong>軟管對刷稽核系統 (hongsheng-web)</strong>：互動式教育訓練與模擬演練，終端機現場操作員模擬，結合 Firebase 實作。</li>
+          <li><strong>產品製程流程圖系統 (flowchart-web)</strong>：槽體製程管控，SVG 畫布互動設計，支援 N2 吹掃模擬與液位動態顯示。</li>
+          <li><strong>ISOTANK 卸料安全訓練 (isotank-training)</strong>：9步驟高度視覺化安全簡報，SVG 動態接管與接地測試演示。</li>
+        </ul>
+      </div>
+      
+      <!-- Slide 3 -->
+      <div class="slide-card" id="slide-3">
+        <div class="slide-header">02. AI 整合與自動化工具</div>
+        <ul class="slide-bullets">
+          <li><strong>Claude HTML 簡報生成技能 (claude-html-slide-builder)</strong>：文字教材自動轉 Reveal.js 簡報，支援 Firebase 文字雲投票，自動部署至 Git Pages。</li>
+          <li><strong>Clasp + Netlify 部署指南 (clasp-netlify-mcp-guide)</strong>：AI Agent 自動化建置閉環系統的標準指南，內含踩坑點避雷指引。</li>
+          <li><strong>LINE 飲食熱量精算師 (generate_docs)</strong>：自動辨識食物照片、寫入試算表，並由腳本自動產生手冊 PDF 與 PPTX。</li>
+        </ul>
+      </div>
+      
+      <!-- Slide 4 -->
+      <div class="slide-card" id="slide-4">
+        <div class="slide-header">03. 系統監控與生活企劃</div>
+        <ul class="slide-bullets">
+          <li><strong>溫度通報系統雙向備援 (監控監測)</strong>：本機與 GAS 雲端雙向同步與心跳機制，當本機斷線時，雲端自動接手通報。</li>
+          <li><strong>大阪冒險之旅四格漫畫電子書 (test)</strong>：四格漫畫互動書，優化 10 歲主角童音，整合 Microsoft 與 ElevenLabs 雙語音。</li>
+          <li><strong>大阪與沖繩自由行旅遊規劃</strong>：包含沖繩 2 大 2 小自由行規劃書，大阪 5 天 4 夜自由行 PPTX 等。</li>
+        </ul>
+      </div>
+      
+      <!-- Slide 5 -->
+      <div class="slide-card" id="slide-5">
+        <div class="slide-header">04. 總結與展望</div>
+        <ul class="slide-bullets">
+          <li>多元專案穩定推進，涵蓋工廠安全、流程自動化、AI 語音、以及系統通報雙重備援。</li>
+          <li>本機與雲端高可用架構（如溫度監控、GDrive 同步機制）已成熟建立。</li>
+          <li>所有專案與文件均已打包歸檔，以備隨時更新維護與平滑轉移。</li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="controls-wrapper">
+      <div class="audio-row">
+        <audio id="slide-audio" src="output/Shihwei_Project_Summary_小偉.wav" controls></audio>
+      </div>
+      <div class="navigation-row">
+        <button class="nav-btn active" id="btn-1" onclick="jumpToSlide(1, 0)">1. 封面</button>
+        <button class="nav-btn" id="btn-2" onclick="jumpToSlide(2, 7.5)">2. 製程與安全</button>
+        <button class="nav-btn" id="btn-3" onclick="jumpToSlide(3, 20.0)">3. AI 與自動化</button>
+        <button class="nav-btn" id="btn-4" onclick="jumpToSlide(4, 33.0)">4. 監控與生活</button>
+        <button class="nav-btn" id="btn-5" onclick="jumpToSlide(5, 45.0)">5. 總結</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="keyboard-hint">💡 播放音檔時簡報會自動翻頁。您也可以點擊下方按鈕或使用鍵盤左右方向鍵手動切換簡報。</div>
+
+  <script>
+    const audio = document.getElementById('slide-audio');
+    const slides = [
+      { id: 'slide-1', btnId: 'btn-1', start: 0, end: 7.5 },
+      { id: 'slide-2', btnId: 'btn-2', start: 7.5, end: 20.0 },
+      { id: 'slide-3', btnId: 'btn-3', start: 20.0, end: 33.0 },
+      { id: 'slide-4', btnId: 'btn-4', start: 33.0, end: 45.0 },
+      { id: 'slide-5', btnId: 'btn-5', start: 45.0, end: 999 }
+    ];
+
+    let currentActiveIndex = 0;
+
+    audio.addEventListener('timeupdate', () => {
+      const currentTime = audio.currentTime;
+      let activeIndex = 0;
+      
+      for (let i = 0; i < slides.length; i++) {
+        if (currentTime >= slides[i].start && currentTime < slides[i].end) {
+          activeIndex = i;
+          break;
+        }
+      }
+      
+      if (activeIndex !== currentActiveIndex) {
+        updateActiveSlide(activeIndex);
+      }
+    });
+
+    function updateActiveSlide(index) {
+      currentActiveIndex = index;
+      
+      // Update slides
+      document.querySelectorAll('.slide-card').forEach((card, idx) => {
+        if (idx === index) {
+          card.classList.add('active');
+        } else {
+          card.classList.remove('active');
+        }
+      });
+      
+      // Update buttons
+      document.querySelectorAll('.nav-btn').forEach((btn, idx) => {
+        if (idx === index) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    window.jumpToSlide = function(slideNum, timestamp) {
+      audio.currentTime = timestamp;
+      audio.play();
+    };
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') {
+        const nextIndex = (currentActiveIndex + 1) % slides.length;
+        jumpToSlide(nextIndex + 1, slides[nextIndex].start);
+      } else if (e.key === 'ArrowLeft') {
+        const prevIndex = (currentActiveIndex - 1 + slides.length) % slides.length;
+        jumpToSlide(prevIndex + 1, slides[prevIndex].start);
+      }
+    });
+  </script>
+</body>
+</html>
