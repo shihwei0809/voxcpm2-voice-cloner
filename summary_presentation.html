@@ -2,312 +2,544 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Shihwei's AI Agent 專案大綱與進度簡報</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-color: #0f172a;
-      --card-bg: #1e293b;
-      --text-main: #f8fafc;
-      --text-sub: #cbd5e1;
-      --accent: #3b82f6;
-      --accent-hover: #60a5fa;
-      --border-color: #334155;
+      --bg: #070d1a;
+      --card: #0f1c2e;
+      --surface: #162338;
+      --accent: #38bdf8;
+      --accent2: #818cf8;
+      --accent3: #34d399;
+      --text: #f0f6ff;
+      --muted: #8899aa;
+      --border: rgba(56,189,248,0.15);
     }
-    
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      margin: 0;
-      padding: 0;
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft JhengHei', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Outfit', 'Microsoft JhengHei', sans-serif;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
+      overflow: hidden;
+      background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(56,189,248,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(129,140,248,0.06) 0%, transparent 60%);
+    }
+
+    .deck {
+      width: 92vw;
+      max-width: 1000px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow:
+        0 0 0 1px rgba(56,189,248,0.08),
+        0 32px 64px rgba(0,0,0,0.5),
+        inset 0 1px 0 rgba(255,255,255,0.05);
       overflow: hidden;
     }
-    
-    .presentation-container {
-      width: 90%;
-      max-width: 960px;
-      height: 600px;
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
-      display: flex;
-      flex-direction: column;
+
+    /* ── Slide area ── */
+    .slides-area {
       position: relative;
+      height: 420px;
+      padding: 48px 56px;
     }
-    
-    .slides-wrapper {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-      padding: 40px;
-    }
-    
-    .slide-card {
+
+    .slide {
       position: absolute;
-      top: 40px;
-      left: 40px;
-      right: 40px;
-      bottom: 40px;
+      inset: 48px 56px;
       opacity: 0;
-      transform: translateY(20px);
-      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      transform: translateY(18px) scale(0.98);
+      transition: opacity 0.45s ease, transform 0.45s ease;
       pointer-events: none;
       display: flex;
       flex-direction: column;
       justify-content: center;
     }
-    
-    .slide-card.active {
+
+    .slide.active {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
       pointer-events: auto;
     }
-    
-    .slide-header {
-      font-size: 1.5em;
-      color: var(--accent);
+
+    /* slide-specific styles */
+    .slide-tag {
+      font-size: 0.78em;
       font-weight: 700;
-      margin-bottom: 20px;
       text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    
-    .slide-title {
-      font-size: 2.8em;
-      font-weight: 800;
-      margin-bottom: 24px;
-      line-height: 1.2;
-    }
-    
-    .slide-meta {
-      font-size: 1.1em;
-      color: #64748b;
-    }
-    
-    .slide-bullets {
-      list-style-type: none;
-      padding: 0;
-      margin: 0;
-    }
-    
-    .slide-bullets li {
-      font-size: 1.2em;
-      line-height: 1.6;
-      margin-bottom: 20px;
-      position: relative;
-      padding-left: 24px;
-      color: var(--text-sub);
-    }
-    
-    .slide-bullets li::before {
-      content: "•";
+      letter-spacing: 3px;
       color: var(--accent);
-      font-size: 1.5em;
-      position: absolute;
-      left: 0;
-      top: -2px;
+      margin-bottom: 14px;
     }
-    
-    .slide-bullets strong {
-      color: var(--text-main);
+
+    .slide-title {
+      font-size: clamp(2em, 4vw, 3em);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 18px;
+      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
-    
-    .controls-wrapper {
-      background: rgba(15, 23, 42, 0.6);
-      border-top: 1px solid var(--border-color);
-      padding: 20px 40px;
-      border-radius: 0 0 20px 20px;
+
+    .slide-sub {
+      font-size: 1em;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .slide-sub span { opacity: 0.6; }
+
+    ul.bullets {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    ul.bullets li {
+      display: flex;
+      gap: 14px;
+      font-size: 1.05em;
+      line-height: 1.55;
+      color: #b8cfe0;
+    }
+
+    ul.bullets li .dot {
+      flex-shrink: 0;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-top: 9px;
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    ul.bullets li .dot.purple { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
+    ul.bullets li .dot.green  { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); }
+
+    ul.bullets li strong {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    /* progress bar header */
+    .progress-header {
+      height: 3px;
+      background: var(--surface);
+      position: relative;
+    }
+
+    #progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%;
+      transition: width 0.3s ease;
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    /* ── Controls ── */
+    .controls {
+      background: rgba(7,13,26,0.7);
+      border-top: 1px solid var(--border);
+      padding: 20px 32px 24px;
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
-    
+
+    /* Audio + label row */
     .audio-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 20px;
+      gap: 14px;
     }
-    
-    audio {
+
+    .audio-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1em;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 0 12px rgba(56,189,248,0.3);
+    }
+
+    .audio-icon:hover { transform: scale(1.1); box-shadow: 0 0 20px rgba(56,189,248,0.5); }
+
+    /* custom waveform bar */
+    .waveform {
       flex: 1;
-      height: 40px;
+      height: 36px;
+      background: var(--surface);
       border-radius: 8px;
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+      border: 1px solid var(--border);
     }
-    
-    .navigation-row {
+
+    #waveform-fill {
+      height: 100%;
+      background: linear-gradient(90deg, rgba(56,189,248,0.25), rgba(129,140,248,0.25));
+      width: 0%;
+      transition: width 0.5s linear;
+    }
+
+    .waveform-bars {
+      position: absolute;
+      inset: 4px 6px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      pointer-events: none;
+    }
+
+    .bar {
+      flex: 1;
+      border-radius: 2px;
+      background: rgba(56,189,248,0.35);
+      animation: wave 1.2s ease-in-out infinite;
+    }
+
+    @keyframes wave {
+      0%, 100% { transform: scaleY(0.4); }
+      50%       { transform: scaleY(1); }
+    }
+
+    .bar:nth-child(odd) { animation-delay: 0.15s; }
+    .bar:nth-child(3n)  { animation-delay: 0.3s; }
+
+    .paused .bar { animation-play-state: paused; }
+
+    .time-label {
+      font-size: 0.82em;
+      color: var(--muted);
+      white-space: nowrap;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    /* nav buttons */
+    .nav-row {
       display: flex;
       justify-content: center;
-      gap: 10px;
+      flex-wrap: wrap;
+      gap: 8px;
     }
-    
+
     .nav-btn {
-      background: #334155;
-      color: var(--text-main);
-      border: none;
-      padding: 8px 16px;
-      border-radius: 8px;
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 7px 18px;
+      border-radius: 999px;
       cursor: pointer;
-      font-size: 0.95em;
+      font-size: 0.88em;
       font-weight: 600;
+      font-family: inherit;
       transition: all 0.2s;
+      white-space: nowrap;
     }
-    
-    .nav-btn.active {
-      background: var(--accent);
-    }
-    
+
     .nav-btn:hover {
-      background: var(--accent-hover);
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(56,189,248,0.08);
     }
-    
-    .keyboard-hint {
+
+    .nav-btn.active {
+      background: linear-gradient(135deg, rgba(56,189,248,0.2), rgba(129,140,248,0.2));
+      border-color: var(--accent);
+      color: var(--text);
+      box-shadow: 0 0 16px rgba(56,189,248,0.2);
+    }
+
+    .hint {
       text-align: center;
-      margin-top: 16px;
-      font-size: 0.85em;
-      color: #475569;
+      margin-top: 12px;
+      font-size: 0.78em;
+      color: #3a4f60;
     }
   </style>
 </head>
 <body>
 
-  <div class="presentation-container">
-    <div class="slides-wrapper">
-      <!-- Slide 1 -->
-      <div class="slide-card active" id="slide-1">
-        <div class="slide-header">Shihwei's AI Agent</div>
-        <div class="slide-title">個人專案總覽與進度報告</div>
-        <div class="slide-meta">報告人：AI 語音助理 小偉 | 時間：2026年6月</div>
-      </div>
-      
-      <!-- Slide 2 -->
-      <div class="slide-card" id="slide-2">
-        <div class="slide-header">01. 製程與安全培訓專案</div>
-        <ul class="slide-bullets">
-          <li><strong>軟管對刷稽核系統 (hongsheng-web)</strong>：互動式教育訓練與模擬演練，終端機現場操作員模擬，結合 Firebase 實作。</li>
-          <li><strong>產品製程流程圖系統 (flowchart-web)</strong>：槽體製程管控，SVG 畫布互動設計，支援 N2 吹掃模擬與液位動態顯示。</li>
-          <li><strong>ISOTANK 卸料安全訓練 (isotank-training)</strong>：9步驟高度視覺化安全簡報，SVG 動態接管與接地測試演示。</li>
-        </ul>
-      </div>
-      
-      <!-- Slide 3 -->
-      <div class="slide-card" id="slide-3">
-        <div class="slide-header">02. AI 整合與自動化工具</div>
-        <ul class="slide-bullets">
-          <li><strong>Claude HTML 簡報生成技能 (claude-html-slide-builder)</strong>：文字教材自動轉 Reveal.js 簡報，支援 Firebase 文字雲投票，自動部署至 Git Pages。</li>
-          <li><strong>Clasp + Netlify 部署指南 (clasp-netlify-mcp-guide)</strong>：AI Agent 自動化建置閉環系統的標準指南，內含踩坑點避雷指引。</li>
-          <li><strong>LINE 飲食熱量精算師 (generate_docs)</strong>：自動辨識食物照片、寫入試算表，並由腳本自動產生手冊 PDF 與 PPTX。</li>
-        </ul>
-      </div>
-      
-      <!-- Slide 4 -->
-      <div class="slide-card" id="slide-4">
-        <div class="slide-header">03. 系統監控與生活企劃</div>
-        <ul class="slide-bullets">
-          <li><strong>溫度通報系統雙向備援 (監控監測)</strong>：本機與 GAS 雲端雙向同步與心跳機制，當本機斷線時，雲端自動接手通報。</li>
-          <li><strong>大阪冒險之旅四格漫畫電子書 (test)</strong>：四格漫畫互動書，優化 10 歲主角童音，整合 Microsoft 與 ElevenLabs 雙語音。</li>
-          <li><strong>大阪與沖繩自由行旅遊規劃</strong>：包含沖繩 2 大 2 小自由行規劃書，大阪 5 天 4 夜自由行 PPTX 等。</li>
-        </ul>
-      </div>
-      
-      <!-- Slide 5 -->
-      <div class="slide-card" id="slide-5">
-        <div class="slide-header">04. 總結與展望</div>
-        <ul class="slide-bullets">
-          <li>多元專案穩定推進，涵蓋工廠安全、流程自動化、AI 語音、以及系統通報雙重備援。</li>
-          <li>本機與雲端高可用架構（如溫度監控、GDrive 同步機制）已成熟建立。</li>
-          <li>所有專案與文件均已打包歸檔，以備隨時更新維護與平滑轉移。</li>
-        </ul>
+<div class="deck">
+  <div class="progress-header"><div id="progress-fill"></div></div>
+
+  <div class="slides-area">
+
+    <!-- Slide 1 -->
+    <div class="slide active" id="slide-1">
+      <div class="slide-tag">Shihwei's AI Agent Projects</div>
+      <div class="slide-title">個人專案總覽<br>與進度報告</div>
+      <div class="slide-sub">
+        <span>🎙️</span>
+        <span>報告人：AI 語音助理 小偉 ｜ 2026 年 6 月</span>
       </div>
     </div>
-    
-    <div class="controls-wrapper">
-      <div class="audio-row">
-        <audio id="slide-audio" src="output/Shihwei_Project_Summary_小偉.wav" controls></audio>
+
+    <!-- Slide 2 -->
+    <div class="slide" id="slide-2">
+      <div class="slide-tag">01. 製程與安全培訓</div>
+      <ul class="bullets">
+        <li>
+          <div class="dot"></div>
+          <div><strong>軟管對刷稽核系統 (hongsheng-web)</strong>：互動式教育訓練與模擬演練，終端機現場操作員模擬，結合 Firebase 實作。</div>
+        </li>
+        <li>
+          <div class="dot purple"></div>
+          <div><strong>產品製程流程圖系統 (flowchart-web)</strong>：槽體製程管控，SVG 畫布互動設計，支援 N2 吹掃模擬與液位動態顯示。</div>
+        </li>
+        <li>
+          <div class="dot green"></div>
+          <div><strong>ISOTANK 卸料安全訓練 (isotank-training)</strong>：9 步驟高度視覺化安全簡報，SVG 動態接管與接地測試演示。</div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Slide 3 -->
+    <div class="slide" id="slide-3">
+      <div class="slide-tag">02. AI 整合與自動化工具</div>
+      <ul class="bullets">
+        <li>
+          <div class="dot"></div>
+          <div><strong>Claude HTML 簡報生成技能</strong>：文字教材自動轉 Reveal.js 簡報，支援 Firebase 文字雲投票，自動部署至 Git Pages。</div>
+        </li>
+        <li>
+          <div class="dot purple"></div>
+          <div><strong>Clasp + Netlify 部署指南</strong>：AI Agent 自動化建置閉環系統的標準指南，內含踩坑點避雷指引。</div>
+        </li>
+        <li>
+          <div class="dot green"></div>
+          <div><strong>LINE 飲食熱量精算師</strong>：自動辨識食物照片、寫入試算表，並由腳本自動產生手冊 PDF 與 PPTX。</div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Slide 4 -->
+    <div class="slide" id="slide-4">
+      <div class="slide-tag">03. 系統監控與生活企劃</div>
+      <ul class="bullets">
+        <li>
+          <div class="dot"></div>
+          <div><strong>溫度通報系統雙向備援</strong>：本機與 GAS 雲端雙向同步與心跳機制，當本機斷線時雲端自動接手通報。</div>
+        </li>
+        <li>
+          <div class="dot purple"></div>
+          <div><strong>大阪冒險之旅四格漫畫電子書</strong>：四格漫畫互動書，優化 10 歲主角童音，整合 Microsoft 與 ElevenLabs 雙語音。</div>
+        </li>
+        <li>
+          <div class="dot green"></div>
+          <div><strong>大阪與沖繩自由行旅遊規劃</strong>：含沖繩 2 大 2 小自由行規劃書、大阪 5 天 4 夜 PPTX 等完整企劃。</div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Slide 5 -->
+    <div class="slide" id="slide-5">
+      <div class="slide-tag">04. 總結與展望</div>
+      <ul class="bullets">
+        <li>
+          <div class="dot"></div>
+          <div>多元專案穩定推進，涵蓋工廠安全、流程自動化、AI 語音及系統通報雙重備援。</div>
+        </li>
+        <li>
+          <div class="dot purple"></div>
+          <div>本機與雲端高可用架構（溫度監控、GDrive 同步）已成熟建立，穩定運行中。</div>
+        </li>
+        <li>
+          <div class="dot green"></div>
+          <div>所有專案與文件均已打包歸檔，以備隨時更新維護與平滑轉移至下一個階段。</div>
+        </li>
+      </ul>
+    </div>
+
+  </div><!-- slides-area -->
+
+  <div class="controls">
+    <div class="audio-row">
+      <div class="audio-icon" id="play-btn" onclick="togglePlay()">▶</div>
+      <div class="waveform paused" id="waveform" onclick="seekByClick(event)">
+        <div id="waveform-fill"></div>
+        <div class="waveform-bars" id="bars"></div>
       </div>
-      <div class="navigation-row">
-        <button class="nav-btn active" id="btn-1" onclick="jumpToSlide(1, 0)">1. 封面</button>
-        <button class="nav-btn" id="btn-2" onclick="jumpToSlide(2, 7.5)">2. 製程與安全</button>
-        <button class="nav-btn" id="btn-3" onclick="jumpToSlide(3, 20.0)">3. AI 與自動化</button>
-        <button class="nav-btn" id="btn-4" onclick="jumpToSlide(4, 33.0)">4. 監控與生活</button>
-        <button class="nav-btn" id="btn-5" onclick="jumpToSlide(5, 45.0)">5. 總結</button>
-      </div>
+      <div class="time-label" id="time-label">0:00 / 0:00</div>
+    </div>
+    <div class="nav-row">
+      <button class="nav-btn active" id="btn-1" onclick="jumpToSlide(0)">1. 封面</button>
+      <button class="nav-btn" id="btn-2" onclick="jumpToSlide(1)">2. 製程與安全</button>
+      <button class="nav-btn" id="btn-3" onclick="jumpToSlide(2)">3. AI 與自動化</button>
+      <button class="nav-btn" id="btn-4" onclick="jumpToSlide(3)">4. 監控與生活</button>
+      <button class="nav-btn" id="btn-5" onclick="jumpToSlide(4)">5. 總結</button>
     </div>
   </div>
-  
-  <div class="keyboard-hint">💡 播放音檔時簡報會自動翻頁。您也可以點擊下方按鈕或使用鍵盤左右方向鍵手動切換簡報。</div>
+</div>
 
-  <script>
-    const audio = document.getElementById('slide-audio');
-    const slides = [
-      { id: 'slide-1', btnId: 'btn-1', start: 0, end: 7.5 },
-      { id: 'slide-2', btnId: 'btn-2', start: 7.5, end: 20.0 },
-      { id: 'slide-3', btnId: 'btn-3', start: 20.0, end: 33.0 },
-      { id: 'slide-4', btnId: 'btn-4', start: 33.0, end: 45.0 },
-      { id: 'slide-5', btnId: 'btn-5', start: 45.0, end: 999 }
-    ];
+<div class="hint">💡 點擊 ▶ 播放時簡報自動翻頁 ｜ 點選頁碼可跳轉 ｜ ← → 鍵手動切換</div>
 
-    let currentActiveIndex = 0;
+<!-- Hidden real audio element -->
+<audio id="real-audio" preload="auto">
+  <source src="output/Shihwei_Project_Summary_小偉.wav" type="audio/wav">
+</audio>
 
-    audio.addEventListener('timeupdate', () => {
-      const currentTime = audio.currentTime;
-      let activeIndex = 0;
-      
-      for (let i = 0; i < slides.length; i++) {
-        if (currentTime >= slides[i].start && currentTime < slides[i].end) {
-          activeIndex = i;
-          break;
-        }
+<script>
+  const audio = document.getElementById('real-audio');
+  const playBtn = document.getElementById('play-btn');
+  const waveform = document.getElementById('waveform');
+  const waveformFill = document.getElementById('waveform-fill');
+  const timeLabel = document.getElementById('time-label');
+  const progressFill = document.getElementById('progress-fill');
+  const barsContainer = document.getElementById('bars');
+
+  // Slide definitions: [slideIndex, audioStart (seconds)]
+  const slides = [
+    { id: 'slide-1', btnId: 'btn-1', start: 0 },
+    { id: 'slide-2', btnId: 'btn-2', start: 8 },
+    { id: 'slide-3', btnId: 'btn-3', start: 22 },
+    { id: 'slide-4', btnId: 'btn-4', start: 36 },
+    { id: 'slide-5', btnId: 'btn-5', start: 50 },
+  ];
+
+  let currentSlideIdx = 0;
+
+  // Build waveform bars
+  for (let i = 0; i < 40; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = (20 + Math.random() * 80) + '%';
+    bar.style.animationDelay = (Math.random() * 1.2) + 's';
+    barsContainer.appendChild(bar);
+  }
+
+  function fmt(s) {
+    if (!isFinite(s)) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  }
+
+  function updateUI() {
+    const dur = audio.duration || 0;
+    const cur = audio.currentTime || 0;
+    const pct = dur > 0 ? (cur / dur) * 100 : 0;
+
+    waveformFill.style.width = pct + '%';
+    progressFill.style.width = pct + '%';
+    timeLabel.textContent = `${fmt(cur)} / ${fmt(dur)}`;
+
+    // Determine which slide should be active
+    let newIdx = 0;
+    for (let i = slides.length - 1; i >= 0; i--) {
+      if (cur >= slides[i].start) {
+        newIdx = i;
+        break;
       }
-      
-      if (activeIndex !== currentActiveIndex) {
-        updateActiveSlide(activeIndex);
-      }
-    });
-
-    function updateActiveSlide(index) {
-      currentActiveIndex = index;
-      
-      // Update slides
-      document.querySelectorAll('.slide-card').forEach((card, idx) => {
-        if (idx === index) {
-          card.classList.add('active');
-        } else {
-          card.classList.remove('active');
-        }
-      });
-      
-      // Update buttons
-      document.querySelectorAll('.nav-btn').forEach((btn, idx) => {
-        if (idx === index) {
-          btn.classList.add('active');
-        } else {
-          btn.classList.remove('active');
-        }
-      });
     }
 
-    window.jumpToSlide = function(slideNum, timestamp) {
-      audio.currentTime = timestamp;
-      audio.play();
+    if (newIdx !== currentSlideIdx) {
+      setActiveSlide(newIdx);
+    }
+  }
+
+  function setActiveSlide(idx) {
+    currentSlideIdx = idx;
+    document.querySelectorAll('.slide').forEach((el, i) => {
+      el.classList.toggle('active', i === idx);
+    });
+    document.querySelectorAll('.nav-btn').forEach((btn, i) => {
+      btn.classList.toggle('active', i === idx);
+    });
+  }
+
+  function togglePlay() {
+    if (audio.paused) {
+      audio.play().catch(e => console.warn('Play failed:', e));
+    } else {
+      audio.pause();
+    }
+  }
+
+  audio.addEventListener('play', () => {
+    playBtn.textContent = '⏸';
+    waveform.classList.remove('paused');
+  });
+
+  audio.addEventListener('pause', () => {
+    playBtn.textContent = '▶';
+    waveform.classList.add('paused');
+  });
+
+  audio.addEventListener('ended', () => {
+    playBtn.textContent = '▶';
+    waveform.classList.add('paused');
+  });
+
+  audio.addEventListener('timeupdate', updateUI);
+  audio.addEventListener('loadedmetadata', updateUI);
+
+  function seekByClick(e) {
+    const rect = waveform.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    const dur = audio.duration;
+    if (isFinite(dur) && dur > 0) {
+      audio.currentTime = ratio * dur;
+      if (audio.paused) audio.play();
+    }
+  }
+
+  // Jump to slide by index, seek to its start time
+  window.jumpToSlide = function(idx) {
+    setActiveSlide(idx);
+    const seekTo = slides[idx].start;
+
+    const doSeek = () => {
+      audio.currentTime = seekTo;
+      audio.play().catch(e => console.warn('Play failed:', e));
     };
 
-    // Keyboard navigation
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight') {
-        const nextIndex = (currentActiveIndex + 1) % slides.length;
-        jumpToSlide(nextIndex + 1, slides[nextIndex].start);
-      } else if (e.key === 'ArrowLeft') {
-        const prevIndex = (currentActiveIndex - 1 + slides.length) % slides.length;
-        jumpToSlide(prevIndex + 1, slides[prevIndex].start);
-      }
-    });
-  </script>
+    if (audio.readyState >= 1) { // HAVE_METADATA
+      doSeek();
+    } else {
+      audio.addEventListener('loadedmetadata', doSeek, { once: true });
+      audio.load();
+    }
+  };
+
+  // Keyboard navigation
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') {
+      const next = Math.min(currentSlideIdx + 1, slides.length - 1);
+      jumpToSlide(next);
+    } else if (e.key === 'ArrowLeft') {
+      const prev = Math.max(currentSlideIdx - 1, 0);
+      jumpToSlide(prev);
+    } else if (e.key === ' ') {
+      e.preventDefault();
+      togglePlay();
+    }
+  });
+</script>
 </body>
 </html>

@@ -186,16 +186,67 @@ def load_history_audio(filename):
     return None
 
 
-def get_presentation_iframe():
-    path = os.path.join(REPO_DIR, "summary_presentation.html")
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
+def scan_presentations():
+    """掃描專案目錄下所有可用的簡報 HTML 檔案（排除 _embedded 結尾）。"""
+    import glob
+    pattern = os.path.join(REPO_DIR, "*.html")
+    files = sorted(glob.glob(pattern))
+    # 過濾掉 _embedded 版本（內部使用），只顯示原始簡報
+    names = [
+        os.path.basename(f) for f in files
+        if not os.path.basename(f).endswith("_embedded.html")
+    ]
+    return names if names else ["（尚無簡報）"]
+
+
+def load_presentation_iframe(filename: str) -> str:
+    """載入指定簡報 HTML，自動嵌入同目錄下同名 WAV（若存在），回傳 iframe HTML。"""
+    import base64, html as html_mod, glob
+
+    if not filename or filename == "（尚無簡報）":
+        return "<div style='padding:40px; text-align:center; color:#64748b;'>請先選擇一份簡報。</div>"
+
+    base = os.path.splitext(filename)[0]          # e.g. summary_presentation
+    html_path     = os.path.join(REPO_DIR, filename)
+    embedded_path = os.path.join(REPO_DIR, base + "_embedded.html")
+
+    # 若已有 embedded 版直接用
+    if os.path.exists(embedded_path):
+        path = embedded_path
+    elif os.path.exists(html_path):
+        # 嘗試找同名 WAV（掃描 output/ 目錄）
+        wav_candidates = glob.glob(os.path.join(REPO_DIR, "output", "*.wav"))
+        # 優先找名稱最接近的
+        matched_wav = None
+        for w in wav_candidates:
+            if base.lower().replace("_", "") in os.path.basename(w).lower().replace("_", ""):
+                matched_wav = w
+                break
+        if not matched_wav and wav_candidates:
+            matched_wav = wav_candidates[0]   # fallback: 第一個 wav
+
+        with open(html_path, "r", encoding="utf-8") as f:
             html_content = f.read()
-            html_content = html_content.replace('src="output/', 'src="file=output/')
-            import html
-            escaped_html = html.escape(html_content)
-            return f'<iframe srcdoc="{escaped_html}" style="width:100%; height:720px; border:none; border-radius:16px;"></iframe>'
-    return "<div style='padding:20px; text-align:center; color:#ef4444;'>⚠️ 找不到簡報播放器檔案 (summary_presentation.html)。</div>"
+
+        if matched_wav:
+            with open(matched_wav, "rb") as af:
+                b64 = base64.b64encode(af.read()).decode("ascii")
+            data_uri = f"data:audio/wav;base64,{b64}"
+            # 替換所有 .wav 路徑為 base64
+            import re
+            html_content = re.sub(r'src="[^"]*\.wav"', f'src="{data_uri}"', html_content)
+
+        with open(embedded_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        path = embedded_path
+    else:
+        return f"<div style='padding:20px; color:#ef4444;'>⚠️ 找不到檔案：{filename}</div>"
+
+    with open(path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    escaped = html_mod.escape(html_content)
+    return f'<iframe srcdoc="{escaped}" style="width:100%; height:700px; border:none; border-radius:16px;"></iframe>'
+
 
 
 def on_save(audio_mic, audio_upload, voice_name):
@@ -280,116 +331,144 @@ def build_ui():
 
                 save_msg = gr.Textbox(label="", show_label=False, lines=5, interactive=False)
 
-        with gr.Column(elem_classes="step-box"):
-            gr.Markdown("## 🎙️ 已錄製的參考聲音 (本機聲音庫)")
-            
-            voice_choices = list_voices()
-            voice_val = voice_choices[0] if voice_choices else None
-            voice_audio, voice_prompt = load_voice_details(voice_val)
-            
-            with gr.Row():
-                voice_dropdown = gr.Dropdown(
-                    label="選擇聲音名稱",
-                    choices=voice_choices,
-                    value=voice_val,
-                    interactive=True,
-                    scale=4,
-                    show_label=False
+                with gr.Column(elem_classes="step-box"):
+                    gr.Markdown("## 🎙️ 已錄製的參考聲音 (本機聲音庫)")
+                    
+                    voice_choices = list_voices()
+                    voice_val = voice_choices[0] if voice_choices else None
+                    voice_audio, voice_prompt = load_voice_details(voice_val)
+                    
+                    with gr.Row():
+                        voice_dropdown = gr.Dropdown(
+                            label="選擇聲音名稱",
+                            choices=voice_choices,
+                            value=voice_val,
+                            interactive=True,
+                            scale=4,
+                            show_label=False
+                        )
+                        refresh_voices_btn = gr.Button("🔄 重新整理", variant="secondary", scale=1)
+                        
+                    with gr.Row():
+                        voice_audio_player = gr.Audio(
+                            label="播放參考音",
+                            value=voice_audio,
+                            type="filepath",
+                            interactive=False,
+                            scale=2
+                        )
+                        voice_prompt_display = gr.Textbox(
+                            label="朗讀文字 (Prompt)",
+                            value=voice_prompt,
+                            interactive=False,
+                            scale=3,
+                            lines=3
+                        )
+
+                def on_voice_change(name):
+                    return load_voice_details(name)
+                    
+                voice_dropdown.change(
+                    fn=on_voice_change,
+                    inputs=[voice_dropdown],
+                    outputs=[voice_audio_player, voice_prompt_display]
                 )
-                refresh_voices_btn = gr.Button("🔄 重新整理", variant="secondary", scale=1)
                 
-            with gr.Row():
-                voice_audio_player = gr.Audio(
-                    label="播放參考音",
-                    value=voice_audio,
-                    type="filepath",
-                    interactive=False,
-                    scale=2
-                )
-                voice_prompt_display = gr.Textbox(
-                    label="朗讀文字 (Prompt)",
-                    value=voice_prompt,
-                    interactive=False,
-                    scale=3,
-                    lines=3
+                def on_refresh_voices():
+                    choices = list_voices()
+                    val = choices[0] if choices else None
+                    audio, prompt = load_voice_details(val)
+                    return gr.Dropdown(choices=choices, value=val), audio, prompt
+
+                refresh_voices_btn.click(
+                    fn=on_refresh_voices,
+                    outputs=[voice_dropdown, voice_audio_player, voice_prompt_display]
                 )
 
-        def on_voice_change(name):
-            return load_voice_details(name)
-            
-        voice_dropdown.change(
-            fn=on_voice_change,
-            inputs=[voice_dropdown],
-            outputs=[voice_audio_player, voice_prompt_display]
-        )
-        
-        def on_refresh_voices():
-            choices = list_voices()
-            val = choices[0] if choices else None
-            audio, prompt = load_voice_details(val)
-            return gr.Dropdown(choices=choices, value=val), audio, prompt
-
-        refresh_voices_btn.click(
-            fn=on_refresh_voices,
-            outputs=[voice_dropdown, voice_audio_player, voice_prompt_display]
-        )
-
-        save_btn.click(
-            fn=on_save,
-            inputs=[audio_mic, audio_upload, voice_name_input],
-            outputs=[save_msg],
-        ).then(
-            fn=on_refresh_voices,
-            outputs=[voice_dropdown, voice_audio_player, voice_prompt_display]
-        )
-
-        with gr.Column(elem_classes="step-box"):
-            gr.Markdown("## 🎵 已生成的複製語音紀錄 (AI 生成庫)")
-            
-            initial_files = list_generated_files()
-            initial_val = initial_files[0] if initial_files else None
-            initial_audio = load_history_audio(initial_val)
-            
-            with gr.Row():
-                history_dropdown = gr.Dropdown(
-                    label="選擇音檔",
-                    choices=initial_files,
-                    value=initial_val,
-                    interactive=True,
-                    scale=4,
-                    show_label=False
+                save_btn.click(
+                    fn=on_save,
+                    inputs=[audio_mic, audio_upload, voice_name_input],
+                    outputs=[save_msg],
+                ).then(
+                    fn=on_refresh_voices,
+                    outputs=[voice_dropdown, voice_audio_player, voice_prompt_display]
                 )
-                refresh_btn = gr.Button("🔄 重新整理", variant="secondary", scale=1)
+
+                with gr.Column(elem_classes="step-box"):
+                    gr.Markdown("## 🎵 已生成的複製語音紀錄 (AI 生成庫)")
+                    
+                    initial_files = list_generated_files()
+                    initial_val = initial_files[0] if initial_files else None
+                    initial_audio = load_history_audio(initial_val)
+                    
+                    with gr.Row():
+                        history_dropdown = gr.Dropdown(
+                            label="選擇音檔",
+                            choices=initial_files,
+                            value=initial_val,
+                            interactive=True,
+                            scale=4,
+                            show_label=False
+                        )
+                        refresh_btn = gr.Button("🔄 重新整理", variant="secondary", scale=1)
+                        
+                    history_audio = gr.Audio(
+                        label="播放音檔",
+                        value=initial_audio,
+                        type="filepath",
+                        interactive=False
+                    )
+
+                def on_dropdown_change(filename):
+                    return load_history_audio(filename)
+                    
+                history_dropdown.change(
+                    fn=on_dropdown_change,
+                    inputs=[history_dropdown],
+                    outputs=[history_audio]
+                )
                 
-            history_audio = gr.Audio(
-                label="播放音檔",
-                value=initial_audio,
-                type="filepath",
-                interactive=False
-            )
+                def on_refresh():
+                    files = list_generated_files()
+                    val = files[0] if files else None
+                    audio_path = load_history_audio(val)
+                    return gr.Dropdown(choices=files, value=val), audio_path
 
-        def on_dropdown_change(filename):
-            return load_history_audio(filename)
-            
-        history_dropdown.change(
-            fn=on_dropdown_change,
-            inputs=[history_dropdown],
-            outputs=[history_audio]
-        )
-        
-        def on_refresh():
-            files = list_generated_files()
-            val = files[0] if files else None
-            audio_path = load_history_audio(val)
-            return gr.Dropdown(choices=files, value=val), audio_path
-
-        refresh_btn.click(
-            fn=on_refresh,
-            outputs=[history_dropdown, history_audio]
-        )
+                refresh_btn.click(
+                    fn=on_refresh,
+                    outputs=[history_dropdown, history_audio]
+                )
 
             with gr.Tab("📊 互動式簡報播放"):
-                gr.HTML(get_presentation_iframe())
+                with gr.Row():
+                    pres_dropdown = gr.Dropdown(
+                        label="選擇簡報",
+                        choices=scan_presentations(),
+                        value=(scan_presentations() or [None])[0],
+                        scale=5,
+                    )
+                    pres_refresh = gr.Button("🔄 重新掃描", variant="secondary", scale=1)
+
+                initial_pres = (scan_presentations() or [None])[0]
+                pres_iframe = gr.HTML(
+                    value=load_presentation_iframe(initial_pres) if initial_pres else ""
+                )
+
+                pres_dropdown.change(
+                    fn=load_presentation_iframe,
+                    inputs=[pres_dropdown],
+                    outputs=[pres_iframe],
+                )
+
+                def refresh_pres_list():
+                    files = scan_presentations()
+                    first = files[0] if files else None
+                    return gr.Dropdown(choices=files, value=first), load_presentation_iframe(first)
+
+                pres_refresh.click(
+                    fn=refresh_pres_list,
+                    outputs=[pres_dropdown, pres_iframe],
+                )
 
         gr.HTML("""
         <div class="footer-text">
