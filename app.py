@@ -127,23 +127,80 @@ body {
 """
 
 
+def get_gdrive_root():
+    possible_roots = [
+        r"G:\我的雲端硬碟\GOOGLE ANGET",
+        r"G:\My Drive\GOOGLE ANGET"
+    ]
+    for root in possible_roots:
+        if os.path.exists(root):
+            return root
+    return None
+
+
+def get_gdrive_output_dir():
+    root = get_gdrive_root()
+    if root:
+        gdrive_output = os.path.join(root, "AI 克隆聲音", "output")
+        if os.path.exists(gdrive_output):
+            return gdrive_output
+    return None
+
+
+def sync_voice_to_gdrive(voice_name, local_ref_path, local_prompt_path):
+    root = get_gdrive_root()
+    if root:
+        try:
+            gdrive_voice_dir = os.path.join(root, "AI 克隆聲音", "voices", voice_name)
+            os.makedirs(gdrive_voice_dir, exist_ok=True)
+            import shutil
+            shutil.copy2(local_ref_path, os.path.join(gdrive_voice_dir, "ref_voice.wav"))
+            shutil.copy2(local_prompt_path, os.path.join(gdrive_voice_dir, "prompt.txt"))
+            print(f"已同步參考聲音「{voice_name}」至雲端硬碟庫")
+            return True
+        except Exception as e:
+            print(f"同步參考聲音至雲端硬碟失敗: {e}")
+    return False
+
+
 def list_voices():
-    vdir = os.path.join(REPO_DIR, "voices")
-    if not os.path.exists(vdir):
-        return []
-    return sorted(
-        d for d in os.listdir(vdir)
-        if os.path.isdir(os.path.join(vdir, d))
-        and os.path.exists(os.path.join(vdir, d, "ref_voice.wav"))
-    )
+    local_vdir = os.path.join(REPO_DIR, "voices")
+    voice_names = set()
+    if os.path.exists(local_vdir):
+        for d in os.listdir(local_vdir):
+            if os.path.isdir(os.path.join(local_vdir, d)) and os.path.exists(os.path.join(local_vdir, d, "ref_voice.wav")):
+                voice_names.add(d)
+                
+    # 掃描雲端硬碟的聲音庫
+    root = get_gdrive_root()
+    if root:
+        gdrive_vdir = os.path.join(root, "AI 克隆聲音", "voices")
+        if os.path.exists(gdrive_vdir):
+            for d in os.listdir(gdrive_vdir):
+                if os.path.isdir(os.path.join(gdrive_vdir, d)) and os.path.exists(os.path.join(gdrive_vdir, d, "ref_voice.wav")):
+                    voice_names.add(d)
+                    
+    return sorted(list(voice_names))
 
 
 def load_voice_details(voice_name):
     if not voice_name:
         return None, ""
+        
+    # 優先查本機
     wav_path = os.path.join(REPO_DIR, "voices", voice_name, "ref_voice.wav")
     prompt_path = os.path.join(REPO_DIR, "voices", voice_name, "prompt.txt")
     
+    # 本機沒有，嘗試查雲端硬碟
+    if not os.path.exists(wav_path):
+        root = get_gdrive_root()
+        if root:
+            g_wav = os.path.join(root, "AI 克隆聲音", "voices", voice_name, "ref_voice.wav")
+            g_txt = os.path.join(root, "AI 克隆聲音", "voices", voice_name, "prompt.txt")
+            if os.path.exists(g_wav):
+                wav_path = g_wav
+                prompt_path = g_txt
+                
     audio_val = wav_path if os.path.exists(wav_path) else None
     
     prompt_val = ""
@@ -169,21 +226,46 @@ def list_generated_files():
     out_dir = os.path.join(REPO_DIR, "output")
     if not os.path.exists(out_dir):
         os.makedirs(out_dir, exist_ok=True)
-    files = sorted(
-        [f for f in os.listdir(out_dir) if f.endswith(".wav")],
-        key=lambda x: os.path.getmtime(os.path.join(out_dir, x)),
+        
+    local_files = [f for f in os.listdir(out_dir) if f.endswith(".wav")]
+    all_files = {f: os.path.join(out_dir, f) for f in local_files}
+    
+    # 掃描雲端硬碟已生成目錄
+    gdrive_dir = get_gdrive_output_dir()
+    if gdrive_dir:
+        gdrive_files = [f for f in os.listdir(gdrive_dir) if f.endswith(".wav")]
+        for f in gdrive_files:
+            g_path = os.path.join(gdrive_dir, f)
+            if f not in all_files:
+                all_files[f] = g_path
+            else:
+                # 若檔名相同，選擇修改時間較新的
+                if os.path.getmtime(g_path) > os.path.getmtime(all_files[f]):
+                    all_files[f] = g_path
+                    
+    sorted_files = sorted(
+        all_files.keys(),
+        key=lambda x: os.path.getmtime(all_files[x]),
         reverse=True
     )
-    return files
+    return sorted_files
 
 
 def load_history_audio(filename):
     if not filename:
         return None
-    file_path = os.path.join(REPO_DIR, "output", filename)
-    if os.path.exists(file_path):
-        return file_path
+    # 本機優先
+    local_path = os.path.join(REPO_DIR, "output", filename)
+    if os.path.exists(local_path):
+        return local_path
+    # 雲端硬碟
+    gdrive_dir = get_gdrive_output_dir()
+    if gdrive_dir:
+        g_path = os.path.join(gdrive_dir, filename)
+        if os.path.exists(g_path):
+            return g_path
     return None
+
 
 
 def scan_presentations():
@@ -214,8 +296,27 @@ def load_presentation_iframe(filename: str) -> str:
     if os.path.exists(embedded_path):
         path = embedded_path
     elif os.path.exists(html_path):
-        # 嘗試找同名 WAV（掃描 output/ 目錄）
-        wav_candidates = glob.glob(os.path.join(REPO_DIR, "output", "*.wav"))
+        # 嘗試找同名 WAV（掃描本機與雲端硬碟的 output/ 目錄）
+        wav_candidates = []
+        local_dir = os.path.join(REPO_DIR, "output")
+        if os.path.exists(local_dir):
+            wav_candidates.extend(glob.glob(os.path.join(local_dir, "*.wav")))
+            
+        gdrive_dir = get_gdrive_output_dir()
+        if gdrive_dir:
+            wav_candidates.extend(glob.glob(os.path.join(gdrive_dir, "*.wav")))
+            
+        # 移除重複的檔名，選擇時間較新的
+        unique_candidates = {}
+        for w in wav_candidates:
+            fname = os.path.basename(w)
+            if fname not in unique_candidates:
+                unique_candidates[fname] = w
+            else:
+                if os.path.getmtime(w) > os.path.getmtime(unique_candidates[fname]):
+                    unique_candidates[fname] = w
+        wav_candidates = list(unique_candidates.values())
+        
         # 優先找名稱最接近的
         matched_wav = None
         for w in wav_candidates:
@@ -223,6 +324,8 @@ def load_presentation_iframe(filename: str) -> str:
                 matched_wav = w
                 break
         if not matched_wav and wav_candidates:
+            # 依時間遞減排序，拿最新的一個
+            wav_candidates.sort(key=os.path.getmtime, reverse=True)
             matched_wav = wav_candidates[0]   # fallback: 第一個 wav
 
         with open(html_path, "r", encoding="utf-8") as f:
@@ -273,9 +376,14 @@ def on_save(audio_mic, audio_upload, voice_name):
         vdir = os.path.join(REPO_DIR, "voices", name)
         os.makedirs(vdir, exist_ok=True)
         import soundfile as sf
-        sf.write(os.path.join(vdir, "ref_voice.wav"), audio.astype(np.float32), SAMPLE_RATE)
-        with open(os.path.join(vdir, "prompt.txt"), "w", encoding="utf-8") as f:
+        ref_path = os.path.join(vdir, "ref_voice.wav")
+        prompt_path = os.path.join(vdir, "prompt.txt")
+        sf.write(ref_path, audio.astype(np.float32), SAMPLE_RATE)
+        with open(prompt_path, "w", encoding="utf-8") as f:
             f.write(load_sample_text())
+
+        # 同步錄製的聲音到雲端硬碟共用資料庫
+        sync_voice_to_gdrive(name, ref_path, prompt_path)
 
         duration = len(audio) / SAMPLE_RATE
         existing = list_voices()
