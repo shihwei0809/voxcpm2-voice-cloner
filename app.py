@@ -519,13 +519,24 @@ def sync_html_and_slides_to_gdrive(html_path, slides_dir):
     return False
 
 def extract_presentation_script(pptx_file):
-    """Step 1: Extract narration text from PPT/PPTX/PDF, return as editable string."""
+    """Step 1: Extract narration text and slide images, return script and list of images."""
     if not pptx_file:
-        return "⚠️ 請先上傳簡報/PDF 檔案。"
+        return "⚠️ 請先上傳簡報/PDF 檔案。", []
     try:
         base_name, ext = os.path.splitext(os.path.basename(pptx_file))
         ext = ext.lower()
+        
+        # 清理特殊字元，確保與後續資料夾命名一致
+        import re
+        base_name = re.sub(r'[^\w\s一-鿿-]', '', base_name).strip().replace(" ", "_")
+        if not base_name:
+            base_name = "presentation"
+            
+        slides_tmp_dir = os.path.join(REPO_DIR, "output", f"slides_{base_name}")
+        os.makedirs(slides_tmp_dir, exist_ok=True)
+        
         slide_texts = []
+        png_files = []
 
         if ext == ".pdf":
             import fitz
@@ -535,7 +546,18 @@ def extract_presentation_script(pptx_file):
                 if not text:
                     text = f"這是第 {i} 頁 PDF 內容。"
                 slide_texts.append(text)
+                
+                # 匯出 PDF 頁面為 PNG
+                zoom = 2
+                mat = fitz.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=mat, alpha=False)
+                png_name = f"slide_{i:03d}.png"
+                out_png = os.path.join(slides_tmp_dir, png_name)
+                pix.save(out_png)
+                png_files.append(f"output/slides_{base_name}/{png_name}")
+                
         elif ext in [".pptx", ".ppt"]:
+            # 1. 擷取文字內容 (PPTX 備忘錄)
             if ext == ".pptx":
                 try:
                     from pptx import Presentation as PptxPres
@@ -545,7 +567,7 @@ def extract_presentation_script(pptx_file):
                         if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
                             note = slide.notes_slide.notes_text_frame.text.strip()
                         if not note:
-                            # fallback: collect visible text from shapes
+                            # fallback: collect visible text
                             parts = []
                             for shape in slide.shapes:
                                 if shape.has_text_frame:
@@ -555,24 +577,49 @@ def extract_presentation_script(pptx_file):
                             note = " ".join(parts) if parts else f"這是第 {i} 頁投影片內容。"
                         slide_texts.append(note)
                 except Exception as e:
-                    return f"❌ 讀取 PPTX 備忘錄失敗：{e}"
+                    return f"❌ 讀取 PPTX 備忘錄失敗：{e}", []
             else:
-                return "⚠️ .ppt 格式需要已安裝 PowerPoint，建議另存為 .pptx 後再上傳。"
+                return "⚠️ .ppt 格式需要已安裝 PowerPoint，建議另存為 .pptx 後再上傳。", []
+                
+            # 2. 匯出投影片圖片為 PNG (PPTX/PPT)
+            try:
+                import win32com.client
+                import pythoncom
+                pythoncom.CoInitialize()
+                try:
+                    ppt_app = win32com.client.Dispatch("PowerPoint.Application")
+                    ppt_app.Visible = True
+                    prs_com = ppt_app.Presentations.Open(os.path.abspath(pptx_file), ReadOnly=True, Untitled=False, WithWindow=False)
+                    total_slides_file = prs_com.Slides.Count
+                    for i in range(1, total_slides_file + 1):
+                        png_name = f"slide_{i:03d}.png"
+                        out_png = os.path.join(slides_tmp_dir, png_name)
+                        prs_com.Slides(i).Export(out_png, "PNG", 1920, 1080)
+                        png_files.append(f"output/slides_{base_name}/{png_name}")
+                    prs_com.Close()
+                    ppt_app.Quit()
+                finally:
+                    pythoncom.CoUninitialize()
+            except Exception as e:
+                return f"❌ 匯出投影片圖片失敗：{e}", []
         else:
-            return "⚠️ 不支援的檔案格式。只支援 .pptx, .ppt 與 .pdf。"
+            return "⚠️ 不支援的檔案格式。只支援 .pptx, .ppt 與 .pdf。", []
 
         if not slide_texts:
-            return "⚠️ 無法解析投影片或 PDF 頁數。"
+            return "⚠️ 無法解析投影片或 PDF 頁數。", []
 
-        # Format as editable block: === 第 N 頁 === \n <text>
+        # 格式化為可編輯區塊
         lines = []
         for i, text in enumerate(slide_texts, 1):
             lines.append(f"=== 第 {i} 頁 ===")
             lines.append(text.strip())
-            lines.append("")  # blank line separator
-        return "\n".join(lines)
+            lines.append("")  # 空行分隔
+            
+        script_content = "\n".join(lines)
+        return script_content, png_files
+        
     except Exception as e:
-        return f"❌ 擷取腳本失敗：{e}"
+        return f"❌ 擷取腳本與投影片失敗：{e}", []
 
 
 def script_text_to_slides(script_text):
@@ -617,46 +664,53 @@ def auto_synthesize_presentation(pptx_file, voice_name, script_text, progress=gr
         
         # --- 使用使用者確認/修改後的腳本，不重新擷取文字 ---
         slide_texts = script_text_to_slides(script_text)
+        # 嘗試讀取先前預覽時已匯出的 PNG 投影片圖片
         png_files = []
-
-        # 仍需從原始檔匯出 PNG 投影片圖片
-        if ext == ".pdf":
-            progress(0, desc="正在讀取 PDF 檔案並匯出投影片圖片...")
-            import fitz
-            doc = fitz.open(pptx_file)
-            total_slides_file = len(doc)
-            for i, page in enumerate(doc, 1):
-                progress((i / total_slides_file) * 0.15, desc=f"匯出第 {i}/{total_slides_file} 頁 PDF 為 PNG...")
-                zoom = 2
-                mat = fitz.Matrix(zoom, zoom)
-                pix = page.get_pixmap(matrix=mat, alpha=False)
-                png_name = f"slide_{i:03d}.png"
-                out_png = os.path.join(slides_tmp_dir, png_name)
-                pix.save(out_png)
-                png_files.append(f"output/slides_{base_name}/{png_name}")
-
-        elif ext in [".pptx", ".ppt"]:
-            progress(0, desc="正在匯出投影片圖片...")
-            import win32com.client
-            import pythoncom
-            pythoncom.CoInitialize()
-            try:
-                ppt_app = win32com.client.Dispatch("PowerPoint.Application")
-                ppt_app.Visible = True
-                prs_com = ppt_app.Presentations.Open(os.path.abspath(pptx_file), ReadOnly=True, Untitled=False, WithWindow=False)
-                total_slides_file = prs_com.Slides.Count
-                for i in range(1, total_slides_file + 1):
-                    progress((i / total_slides_file) * 0.15, desc=f"匯出第 {i}/{total_slides_file} 頁投影片為 PNG...")
+        import glob
+        existing_pngs = sorted(glob.glob(os.path.join(slides_tmp_dir, "slide_*.png")))
+        
+        if existing_pngs:
+            for p in existing_pngs:
+                png_files.append(os.path.relpath(p, REPO_DIR).replace("\\", "/"))
+        else:
+            # 備用：若不存在則重新匯出
+            if ext == ".pdf":
+                progress(0, desc="正在讀取 PDF 檔案並匯出投影片圖片...")
+                import fitz
+                doc = fitz.open(pptx_file)
+                total_slides_file = len(doc)
+                for i, page in enumerate(doc, 1):
+                    progress((i / total_slides_file) * 0.15, desc=f"匯出第 {i}/{total_slides_file} 頁 PDF 為 PNG...")
+                    zoom = 2
+                    mat = fitz.Matrix(zoom, zoom)
+                    pix = page.get_pixmap(matrix=mat, alpha=False)
                     png_name = f"slide_{i:03d}.png"
                     out_png = os.path.join(slides_tmp_dir, png_name)
-                    prs_com.Slides(i).Export(out_png, "PNG", 1920, 1080)
+                    pix.save(out_png)
                     png_files.append(f"output/slides_{base_name}/{png_name}")
-                prs_com.Close()
-                ppt_app.Quit()
-            finally:
-                pythoncom.CoUninitialize()
-        else:
-            return "⚠️ 不支援的檔案格式。只支援 .pptx, .ppt 與 .pdf。"
+
+            elif ext in [".pptx", ".ppt"]:
+                progress(0, desc="正在匯出投影片圖片...")
+                import win32com.client
+                import pythoncom
+                pythoncom.CoInitialize()
+                try:
+                    ppt_app = win32com.client.Dispatch("PowerPoint.Application")
+                    ppt_app.Visible = True
+                    prs_com = ppt_app.Presentations.Open(os.path.abspath(pptx_file), ReadOnly=True, Untitled=False, WithWindow=False)
+                    total_slides_file = prs_com.Slides.Count
+                    for i in range(1, total_slides_file + 1):
+                        progress((i / total_slides_file) * 0.15, desc=f"匯出第 {i}/{total_slides_file} 頁投影片為 PNG...")
+                        png_name = f"slide_{i:03d}.png"
+                        out_png = os.path.join(slides_tmp_dir, png_name)
+                        prs_com.Slides(i).Export(out_png, "PNG", 1920, 1080)
+                        png_files.append(f"output/slides_{base_name}/{png_name}")
+                    prs_com.Close()
+                    ppt_app.Quit()
+                finally:
+                    pythoncom.CoUninitialize()
+            else:
+                return "⚠️ 不支援的檔案格式。只支援 .pptx, .ppt 與 .pdf。"
 
         total_slides = len(slide_texts)
         if total_slides == 0:
@@ -1099,12 +1153,23 @@ def build_ui():
                 with gr.Column(elem_classes="step-box"):
                     gr.Markdown("## 2. 確認並修改腳本")
                     gr.Markdown("✏️ *每頁以 `=== 第 N 頁 ===` 分隔，您可以直接在下方文字框修改每頁的朗讀內容。*")
-                    script_preview = gr.Textbox(
-                        label="腳本內容（可直接編輯）",
-                        lines=20,
-                        interactive=True,
-                        placeholder="點擊上方「預覽腳本」後，腳本將會顯示在此處，您可以直接修改每頁文字後再按生成..."
-                    )
+                    with gr.Row():
+                        with gr.Column(scale=3):
+                            script_preview = gr.Textbox(
+                                label="腳本內容（可直接編輯）",
+                                lines=20,
+                                interactive=True,
+                                placeholder="點擊上方「預覽腳本」後，腳本將會顯示在此處，您可以直接修改每頁文字後再按生成..."
+                            )
+                        with gr.Column(scale=2):
+                            slide_gallery = gr.Gallery(
+                                label="投影片畫面預覽",
+                                show_label=True,
+                                columns=2,
+                                height=450,
+                                object_fit="contain",
+                                preview=True
+                            )
 
                 with gr.Column(elem_classes="step-box"):
                     gr.Markdown("## 3. 選擇聲音並生成")
@@ -1121,7 +1186,7 @@ def build_ui():
                 extract_btn.click(
                     fn=extract_presentation_script,
                     inputs=[pptx_upload],
-                    outputs=[script_preview]
+                    outputs=[script_preview, slide_gallery]
                 )
 
                 synth_btn.click(
