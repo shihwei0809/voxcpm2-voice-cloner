@@ -238,6 +238,42 @@ def sync_voice_to_gdrive(voice_name, local_ref_path, local_prompt_path):
     return False
 
 
+EDGE_TTS_VOICES = {
+    "[微軟內建] 曉臻 (zh-TW-HsiaoChenNeural - 台灣女聲)": "zh-TW-HsiaoChenNeural",
+    "[微軟內建] 曉雨 (zh-TW-HsiaoYuNeural - 台灣女聲)": "zh-TW-HsiaoYuNeural",
+    "[微軟內建] 雲哲 (zh-TW-YunJheNeural - 台灣男聲)": "zh-TW-YunJheNeural",
+    "[微軟內建] 曉曉 (zh-CN-XiaoxiaoNeural - 內地女聲)": "zh-CN-XiaoxiaoNeural",
+    "[微軟內建] 雲希 (zh-CN-YunxiNeural - 內地男聲)": "zh-CN-YunxiNeural",
+    "[微軟內建] 雲健 (zh-CN-YunjianNeural - 內地男聲)": "zh-CN-YunjianNeural",
+    "[微軟內建] 曉佳 (zh-CN-XiaojiaNeural - 內地女聲)": "zh-CN-XiaojiaNeural",
+}
+
+
+def generate_edge_tts_preview(voice_id):
+    temp_preview_path = os.path.join(REPO_DIR, "output", f"preview_{voice_id}.mp3")
+    if not os.path.exists(temp_preview_path):
+        os.makedirs(os.path.dirname(temp_preview_path), exist_ok=True)
+        text = "您好！我是微軟內建的語音。當您選擇我時，語音將會透過雲端快速合成。"
+        if "zh-CN" in voice_id:
+            text = "您好！我是微软内建的语音。当您选择我时，语音将会通过云端快速合成。"
+        
+        import asyncio
+        import edge_tts
+        async def _speak():
+            communicate = edge_tts.Communicate(text, voice_id)
+            await communicate.save(temp_preview_path)
+            
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(_speak())
+            loop.close()
+        except Exception as e:
+            print(f"Error generating Edge TTS preview: {e}")
+            return None
+    return temp_preview_path
+
+
 def list_voices():
     local_vdir = os.path.join(REPO_DIR, "voices")
     voice_names = set()
@@ -255,12 +291,19 @@ def list_voices():
                 if os.path.isdir(os.path.join(gdrive_vdir, d)) and os.path.exists(os.path.join(gdrive_vdir, d, "ref_voice.wav")):
                     voice_names.add(d)
                     
-    return sorted(list(voice_names))
+    presets = list(EDGE_TTS_VOICES.keys())
+    return sorted(list(voice_names)) + presets
 
 
 def load_voice_details(voice_name):
     if not voice_name:
         return None, ""
+        
+    if voice_name.startswith("[微軟內建]"):
+        voice_id = EDGE_TTS_VOICES.get(voice_name, "zh-TW-HsiaoChenNeural")
+        preview_path = generate_edge_tts_preview(voice_id)
+        desc = f"微軟內建語音 ({voice_id})，直接使用 Edge-TTS 線上生成（免下載模型、免 CPU 耗時運算，極速生成）。"
+        return preview_path, desc
         
     # 優先查本機
     wav_path = os.path.join(REPO_DIR, "voices", voice_name, "ref_voice.wav")
@@ -789,58 +832,114 @@ def auto_synthesize_presentation(pptx_file, voice_name, script_text, progress=gr
         if total_slides == 0:
             return "⚠️ 腳本內容為空，請確認腳本格式正確（每頁以 === 第 N 頁 === 分隔）。"
             
-        progress(0.15, desc=f"共 {total_slides} 頁。正在載入 VoxCPM2 語音模型...")
-        
-        from voxcpm import VoxCPM
-        import soundfile as sf
-        import numpy as np
-        
-        # 決定裝置
-        import torch
-        if torch.cuda.is_available():
-            dev = "cuda"
-        elif hasattr(torch, "xpu") and torch.xpu.is_available():
-            dev = "xpu"
-        else:
-            dev = "cpu"
-            
-        ref_wav, prompt_text = load_voice_details(voice_name)
-        if not ref_wav:
-            return f"⚠️ 找不到克隆聲音「{voice_name}」的參考音檔。"
-            
-        model = VoxCPM.from_pretrained('openbmb/VoxCPM2', load_denoiser=False, device=dev, optimize=False)
-        
-        # 合成每張投影片語音
-        wav_clips = []
-        timings = []
-        
-        for i, note in enumerate(slide_texts, 1):
-            pct = 0.2 + (i / total_slides) * 0.55
-            progress(pct, desc=f"[{i}/{total_slides}] 正在合成第 {i} 頁備忘錄語音... ({len(note)} 字)")
-            wav = model.generate(
-                text=note,
-                prompt_wav_path=ref_wav,
-                prompt_text=prompt_text,
-                reference_wav_path=ref_wav,
-                cfg_value=1.5,
-                inference_timesteps=10,
-            )
-            wav_clips.append(wav)
-            dur = len(wav) / model.tts_model.sample_rate
-            timings.append(dur)
-            
-            # 每頁結束加停頓 0.5 秒
-            pause = np.zeros(int(0.5 * model.tts_model.sample_rate), dtype=wav.dtype)
-            wav_clips.append(pause)
-            timings[-1] += 0.5
-            
-        progress(0.8, desc="正在合併並儲存完整配音檔...")
-        full_audio = np.concatenate(wav_clips)
-        
-        out_wav_name = f"{base_name}_{voice_name}.wav"
+        out_wav_name = f"{base_name}_{voice_name.replace('[微軟內建] ', '')}.wav"
         out_wav_path = os.path.join(REPO_DIR, "output", out_wav_name)
         os.makedirs(os.path.dirname(out_wav_path), exist_ok=True)
-        sf.write(out_wav_path, full_audio, model.tts_model.sample_rate)
+        
+        if voice_name.startswith("[微軟內建]"):
+            # 微軟內建語音 Edge-TTS 分支
+            voice_id = EDGE_TTS_VOICES.get(voice_name, "zh-TW-HsiaoChenNeural")
+            import edge_tts
+            import librosa
+            import soundfile as sf
+            import numpy as np
+            import asyncio
+            import tempfile
+            
+            wav_clips = []
+            timings = []
+            
+            for i, note in enumerate(slide_texts, 1):
+                pct = 0.15 + (i / total_slides) * 0.6
+                progress(pct, desc=f"[{i}/{total_slides}] 正在使用微軟內建語音合成第 {i} 頁語音... ({len(note)} 字)")
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
+                    tmp_mp3_path = tmp_mp3.name
+                
+                async def _speak():
+                    communicate = edge_tts.Communicate(note, voice_id)
+                    await communicate.save(tmp_mp3_path)
+                
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(_speak())
+                    loop.close()
+                    
+                    y, sr = librosa.load(tmp_mp3_path, sr=48000)
+                    wav_clips.append(y)
+                    dur = len(y) / 48000
+                    timings.append(dur)
+                    
+                    pause = np.zeros(int(0.5 * 48000), dtype=y.dtype)
+                    wav_clips.append(pause)
+                    timings[-1] += 0.5
+                except Exception as e:
+                    print(f"Edge-TTS error at slide {i}: {e}")
+                    y = np.zeros(int(1.0 * 48000), dtype=np.float32)
+                    wav_clips.append(y)
+                    timings.append(1.0)
+                finally:
+                    if os.path.exists(tmp_mp3_path):
+                        try:
+                            os.remove(tmp_mp3_path)
+                        except Exception:
+                            pass
+            
+            progress(0.8, desc="正在合併並儲存完整配音檔...")
+            full_audio = np.concatenate(wav_clips)
+            sf.write(out_wav_path, full_audio, 48000)
+            
+        else:
+            # 原本的 VoxCPM2 克隆語音分支
+            progress(0.15, desc=f"共 {total_slides} 頁。正在載入 VoxCPM2 語音模型...")
+            
+            from voxcpm import VoxCPM
+            import soundfile as sf
+            import numpy as np
+            
+            # 決定裝置
+            import torch
+            if torch.cuda.is_available():
+                dev = "cuda"
+            elif hasattr(torch, "xpu") and torch.xpu.is_available():
+                dev = "xpu"
+            else:
+                dev = "cpu"
+                
+            ref_wav, prompt_text = load_voice_details(voice_name)
+            if not ref_wav:
+                return f"⚠️ 找不到克隆聲音「{voice_name}」的參考音檔。"
+                
+            model = VoxCPM.from_pretrained('openbmb/VoxCPM2', load_denoiser=False, device=dev, optimize=False)
+            
+            # 合成每張投影片語音
+            wav_clips = []
+            timings = []
+            
+            for i, note in enumerate(slide_texts, 1):
+                pct = 0.2 + (i / total_slides) * 0.55
+                progress(pct, desc=f"[{i}/{total_slides}] 正在合成第 {i} 頁備忘錄語音... ({len(note)} 字)")
+                wav = model.generate(
+                    text=note,
+                    prompt_wav_path=ref_wav,
+                    prompt_text=prompt_text,
+                    reference_wav_path=ref_wav,
+                    cfg_value=1.5,
+                    inference_timesteps=10,
+                )
+                wav_clips.append(wav)
+                dur = len(wav) / model.tts_model.sample_rate
+                timings.append(dur)
+                
+                # 每頁結束加停頓 0.5 秒
+                pause = np.zeros(int(0.5 * model.tts_model.sample_rate), dtype=wav.dtype)
+                wav_clips.append(pause)
+                timings[-1] += 0.5
+                
+            progress(0.8, desc="正在合併並儲存完整配音檔...")
+            full_audio = np.concatenate(wav_clips)
+            sf.write(out_wav_path, full_audio, model.tts_model.sample_rate)
         
         # 雲端同步
         sync_wav_dest = ""
