@@ -8,6 +8,11 @@ app.py - VoxCPM2 語音錄製工具
 """
 
 import os
+# 設定 Hugging Face 鏡像站以加速下載並防止連線中斷
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+# 停用 Windows 符號連結警告
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+
 import ssl
 # 繞過 urllib/urllib2 SSL 憑證驗證
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -25,9 +30,47 @@ try:
         kwargs['verify'] = False
         return old_request(*args, **kwargs)
     requests.Session.request = new_request
-    print("已成功套用全域 SSL 憑證驗證繞過修正")
+    print("已成功套用 requests SSL 憑證驗證繞過修正")
 except Exception as e:
     print(f"無法套用 requests SSL 繞過修正: {e}")
+
+# 繞過 httpx 庫的 SSL 憑證驗證 (新版 Hugging Face Hub 使用 httpx)
+try:
+    import httpx
+    # 覆寫 Client.__init__ 與 AsyncClient.__init__ 強制將 verify 設為 False
+    old_client_init = httpx.Client.__init__
+    def new_client_init(self, *args, **kwargs):
+        kwargs['verify'] = False
+        old_client_init(self, *args, **kwargs)
+    httpx.Client.__init__ = new_client_init
+
+    old_async_client_init = httpx.AsyncClient.__init__
+    def new_async_client_init(self, *args, **kwargs):
+        kwargs['verify'] = False
+        old_async_client_init(self, *args, **kwargs)
+    httpx.AsyncClient.__init__ = new_async_client_init
+    print("已成功套用 httpx SSL 憑證驗證繞過修正")
+except Exception as e:
+    print(f"無法套用 httpx SSL 繞過修正: {e}")
+
+# 覆寫 huggingface_hub.snapshot_download，將 openbmb/VoxCPM2 的下載請求轉導至 ModelScope，解決 Hugging Face LFS 重定向被公司網關封鎖的問題
+try:
+    import huggingface_hub
+    old_snapshot_download = huggingface_hub.snapshot_download
+    def patched_snapshot_download(*args, **kwargs):
+        repo_id = kwargs.get('repo_id') or (args[0] if args else None)
+        if repo_id == 'openbmb/VoxCPM2':
+            print(f"偵測到下載 {repo_id}，正在自動轉導至 ModelScope 進行高速安全下載...")
+            ms_kwargs = {}
+            if 'revision' in kwargs:
+                ms_kwargs['revision'] = kwargs['revision']
+            from modelscope.hub.snapshot_download import snapshot_download as ms_snapshot_download
+            return ms_snapshot_download(model_id=repo_id, **ms_kwargs)
+        return old_snapshot_download(*args, **kwargs)
+    huggingface_hub.snapshot_download = patched_snapshot_download
+    print("已成功設定 HuggingFace 轉導 ModelScope 機制")
+except Exception as e:
+    print(f"無法套用 HuggingFace 轉導 ModelScope 修正: {e}")
 
 import numpy as np
 import gradio as gr
