@@ -10,12 +10,6 @@ pretrained_models/
 *.safetensors
 *.pth
 
-# 內嵌音頻的 HTML（含 base64，不上傳）
-*_embedded.html
-
-# 影片輸出
-*.mp4
-
 # 音檔（含 voices/ 內的參考音，屬個人資料不進版控）
 ref_voice.wav
 *.wav

@@ -28,51 +28,19 @@ def load_voice(voice_name):
     voice_dir = os.path.join(REPO_DIR, "voices", voice_name)
     ref_wav = os.path.join(voice_dir, "ref_voice.wav")
     prompt_file = os.path.join(voice_dir, "prompt.txt")
-    
-    # 支援雲端硬碟備份庫查找
-    if not os.path.exists(ref_wav):
-        gdrive = get_gdrive_root()
-        if gdrive:
-            g_voice_dir = os.path.join(gdrive, "AI 克隆聲音", "voices", voice_name)
-            g_ref = os.path.join(g_voice_dir, "ref_voice.wav")
-            g_txt = os.path.join(g_voice_dir, "prompt.txt")
-            if os.path.exists(g_ref):
-                ref_wav = g_ref
-                prompt_file = g_txt
-                
     with open(prompt_file, "r", encoding="utf-8") as f:
         prompt_text = f.read().strip()
     return ref_wav, prompt_text
 
-
-def get_gdrive_root():
-    possible_roots = [
-        r"G:\我的雲端硬碟\GOOGLE ANGET",
-        r"G:\My Drive\GOOGLE ANGET"
-    ]
-    for root in possible_roots:
-        if os.path.exists(root):
-            return root
-    return None
-
 def main():
     print("載入 VoxCPM2 模型...")
     t0 = time.time()
-    # 支援動態選擇 GPU / XPU / CPU
-    import torch
-    if torch.cuda.is_available():
-        dev = "cuda"
-    elif hasattr(torch, "xpu") and torch.xpu.is_available():
-        dev = "xpu"
-    else:
-        dev = "cpu"
-    model = VoxCPM.from_pretrained("openbmb/VoxCPM2", load_denoiser=False, device=dev, optimize=False)
-    print(f"模型載入完成，裝置: {dev}，耗時 {time.time()-t0:.1f}s\n")
+    model = VoxCPM.from_pretrained("openbmb/VoxCPM2", load_denoiser=False, device="xpu", optimize=False)
+    print(f"模型載入完成，耗時 {time.time()-t0:.1f}s\n")
 
     # 預載兩個聲音的參考資料
     voices = {}
     for name in ["三師爸", "三帥媽"]:
-        # 雲端庫優先或 fallback 邏輯已由 load_voice 本身處理（若 voices 資料夾不存在則在 load_voice 中檢查）
         voices[name] = load_voice(name)
         print(f"  已載入聲音: {name}")
 
@@ -111,20 +79,6 @@ def main():
     print(f"\n對話生成完成！")
     print(f"  總長度: {total_duration:.1f}s")
     print(f"  檔案: {output_path}")
-
-    # 同步複製到 Google Drive 雲端硬碟共用資料夾
-    gdrive = get_gdrive_root()
-    if gdrive:
-        try:
-            gdrive_output_dir = os.path.join(gdrive, "AI 克隆聲音", "output")
-            os.makedirs(gdrive_output_dir, exist_ok=True)
-            import shutil
-            dest_path = os.path.join(gdrive_output_dir, os.path.basename(output_path))
-            shutil.copy2(output_path, dest_path)
-            print(f"已同步備份至雲端硬碟: {dest_path}")
-        except Exception as e:
-            print(f"同步至雲端硬碟失敗: {e}")
-
 
 if __name__ == "__main__":
     main()

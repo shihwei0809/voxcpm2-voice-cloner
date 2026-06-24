@@ -501,9 +501,10 @@ def sync_html_and_slides_to_gdrive(html_path, slides_dir):
     root = get_gdrive_root()
     if root:
         try:
-            import shutil
-            # 複製 HTML
-            gdrive_html = os.path.join(root, "AI 克隆聲音", os.path.basename(html_path))
+            # 複製 HTML 到 presentations 資料夾
+            gdrive_html_dir = os.path.join(root, "AI 克隆聲音", "presentations")
+            os.makedirs(gdrive_html_dir, exist_ok=True)
+            gdrive_html = os.path.join(gdrive_html_dir, os.path.basename(html_path))
             shutil.copy2(html_path, gdrive_html)
             
             # 複製投影片圖片目錄
@@ -731,7 +732,8 @@ def auto_synthesize_presentation(pptx_file, voice_name, script_text, progress=gr
         progress(0.85, desc="正在產生互動式簡報網頁...")
         slides_html_parts = []
         for i, img_path in enumerate(png_files):
-            slides_html_parts.append(f'<img class="slide-img" src="{img_path}">')
+            # 由於 HTML 將儲存於 presentations/ 子目錄，使用 ../ 前綴以正確指向 output/slides_...
+            slides_html_parts.append(f'<img class="slide-img" src="../{img_path}">')
         slides_html = "\n      ".join(slides_html_parts)
         
         # 內嵌 wav 音軌 base64
@@ -746,7 +748,9 @@ def auto_synthesize_presentation(pptx_file, voice_name, script_text, progress=gr
         html_content = html_content.replace("{timings_json}", json.dumps(timings))
         
         out_html_name = f"{base_name}.html"
-        out_html_path = os.path.join(REPO_DIR, out_html_name)
+        presentations_dir = os.path.join(REPO_DIR, "presentations")
+        os.makedirs(presentations_dir, exist_ok=True)
+        out_html_path = os.path.join(presentations_dir, out_html_name)
         with open(out_html_path, "w", encoding="utf-8") as f:
             f.write(html_content)
             
@@ -758,11 +762,11 @@ def auto_synthesize_presentation(pptx_file, voice_name, script_text, progress=gr
         return (
             f"🎉 投影片自動合成成功！\n\n"
             f"1. 完整配音已存至本機: `output/{out_wav_name}`\n"
-            f"2. 互動式網頁已產生: `{out_html_name}`\n"
+            f"2. 互動式網頁已產生: `presentations/{out_html_name}`\n"
             f"3. 投影片底圖資料夾: `output/slides_{base_name}/`\n\n"
             f"🔗 雲端硬碟同步：\n"
             f"   - 音檔: `{sync_wav_dest or '無（未偵測到雲端硬碟）'}`\n"
-            f"   - 網頁: `G:\\我的雲端硬碟\\GOOGLE ANGET\\AI 克隆聲音\\{out_html_name}`\n\n"
+            f"   - 網頁: `G:\\我的雲端硬碟\\GOOGLE ANGET\\AI 克隆聲音\\presentations\\{out_html_name}`\n\n"
             f"👉 請切換到「📊 互動式簡報播放」分頁，點擊「🔄 重新掃描」，並在下拉選單選擇 `{out_html_name}` 即可開始播放對齊克隆語音的投影片！"
         )
     except Exception as e:
@@ -772,9 +776,12 @@ def auto_synthesize_presentation(pptx_file, voice_name, script_text, progress=gr
 
 
 def scan_presentations():
-    """掃描專案目錄下所有可用的簡報 HTML 檔案（排除 _embedded 結尾）。"""
+    """掃描 presentations/ 目錄下所有可用的簡報 HTML 檔案（排除 _embedded 結尾）。"""
     import glob
-    pattern = os.path.join(REPO_DIR, "*.html")
+    presentations_dir = os.path.join(REPO_DIR, "presentations")
+    if not os.path.exists(presentations_dir):
+        return ["（尚無簡報）"]
+    pattern = os.path.join(presentations_dir, "*.html")
     files = sorted(glob.glob(pattern))
     # 過濾掉 _embedded 版本（內部使用），只顯示原始簡報
     names = [
@@ -792,8 +799,9 @@ def load_presentation_iframe(filename: str) -> str:
         return "<div style='padding:40px; text-align:center; color:#64748b;'>請先選擇一份簡報。</div>"
 
     base = os.path.splitext(filename)[0]          # e.g. summary_presentation
-    html_path     = os.path.join(REPO_DIR, filename)
-    embedded_path = os.path.join(REPO_DIR, base + "_embedded.html")
+    presentations_dir = os.path.join(REPO_DIR, "presentations")
+    html_path     = os.path.join(presentations_dir, filename)
+    embedded_path = os.path.join(presentations_dir, base + "_embedded.html")
 
     # 若已有 embedded 版直接用
     if os.path.exists(embedded_path):

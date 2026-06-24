@@ -98,14 +98,14 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "  PyTorch installation completed." -ForegroundColor Green
 
-# --- Step 5: Install voxcpm + sounddevice + resampy ---
-Write-Host '[5/6] Installing voxcpm + sounddevice + resampy...' -ForegroundColor Yellow
-python -m uv pip install --python $venvPython voxcpm sounddevice resampy
+# --- Step 5: Install voxcpm + sounddevice + resampy + presentation tools ---
+Write-Host '[5/6] Installing voxcpm, sounddevice, resampy, pymupdf, python-pptx, pywin32...' -ForegroundColor Yellow
+python -m uv pip install --python $venvPython voxcpm sounddevice resampy pymupdf python-pptx pywin32
 if ($LASTEXITCODE -ne 0) {
-    Write-Host '  [Error] Failed to install voxcpm + sounddevice + resampy.' -ForegroundColor Red
+    Write-Host '  [Error] Failed to install required packages.' -ForegroundColor Red
     exit 1
 }
-Write-Host "  voxcpm + sounddevice + resampy installation completed." -ForegroundColor Green
+Write-Host "  Package installation completed." -ForegroundColor Green
 
 # --- Step 6: XPU Auto patch ---
 if ($gpuType -eq 'xpu') {

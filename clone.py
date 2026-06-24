@@ -38,34 +38,11 @@ def detect_device():
     return device_map.get(gpu_type, 'cpu')
 
 
-def get_gdrive_root():
-    possible_roots = [
-        r"G:\我的雲端硬碟\GOOGLE ANGET",
-        r"G:\My Drive\GOOGLE ANGET"
-    ]
-    for root in possible_roots:
-        if os.path.exists(root):
-            return root
-    return None
-
-
 def resolve_voice_files(voice, reference_override, text_override):
     """根據 voice 名稱解析參考音和逐字稿路徑。"""
     voice_dir = os.path.join(REPO_DIR, 'voices', voice)
     reference = reference_override or os.path.join(voice_dir, 'ref_voice.wav')
     text_file = text_override or os.path.join(voice_dir, 'prompt.txt')
-    
-    # 如果本機找不到，嘗試找雲端硬碟中的共用聲音庫
-    if not os.path.exists(reference):
-        gdrive = get_gdrive_root()
-        if gdrive:
-            g_voice_dir = os.path.join(gdrive, 'AI 克隆聲音', 'voices', voice)
-            g_ref = os.path.join(g_voice_dir, 'ref_voice.wav')
-            g_txt = os.path.join(g_voice_dir, 'prompt.txt')
-            if os.path.exists(g_ref):
-                reference = reference_override or g_ref
-                text_file = text_override or g_txt
-                
     return reference, text_file
 
 
@@ -150,20 +127,6 @@ def main():
     os.makedirs(os.path.dirname(args.output) or '.', exist_ok=True)
     sf.write(args.output, wav, model.tts_model.sample_rate)
     print(f'已存檔: {args.output}')
-
-    # 同步複製到 Google Drive 雲端硬碟共用資料夾
-    gdrive = get_gdrive_root()
-    if gdrive:
-        try:
-            gdrive_output_dir = os.path.join(gdrive, "AI 克隆聲音", "output")
-            os.makedirs(gdrive_output_dir, exist_ok=True)
-            import shutil
-            dest_path = os.path.join(gdrive_output_dir, os.path.basename(args.output))
-            shutil.copy2(args.output, dest_path)
-            print(f'已同步備份至雲端硬碟: {dest_path}')
-        except Exception as e:
-            print(f'同步至雲端硬碟失敗: {e}')
-
 
 
 if __name__ == '__main__':
