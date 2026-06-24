@@ -517,14 +517,91 @@ def sync_html_and_slides_to_gdrive(html_path, slides_dir):
             print(f"同步投影片檔案至雲端硬碟失敗: {e}")
     return False
 
+def extract_presentation_script(pptx_file):
+    """Step 1: Extract narration text from PPT/PPTX/PDF, return as editable string."""
+    if not pptx_file:
+        return "⚠️ 請先上傳簡報/PDF 檔案。"
+    try:
+        base_name, ext = os.path.splitext(os.path.basename(pptx_file))
+        ext = ext.lower()
+        slide_texts = []
 
-def auto_synthesize_presentation(pptx_file, voice_name, progress=gr.Progress()):
+        if ext == ".pdf":
+            import fitz
+            doc = fitz.open(pptx_file)
+            for i, page in enumerate(doc, 1):
+                text = page.get_text().strip()
+                if not text:
+                    text = f"這是第 {i} 頁 PDF 內容。"
+                slide_texts.append(text)
+        elif ext in [".pptx", ".ppt"]:
+            if ext == ".pptx":
+                try:
+                    from pptx import Presentation as PptxPres
+                    prs = PptxPres(pptx_file)
+                    for i, slide in enumerate(prs.slides, 1):
+                        note = ""
+                        if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
+                            note = slide.notes_slide.notes_text_frame.text.strip()
+                        if not note:
+                            # fallback: collect visible text from shapes
+                            parts = []
+                            for shape in slide.shapes:
+                                if shape.has_text_frame:
+                                    t = shape.text_frame.text.strip()
+                                    if t:
+                                        parts.append(t)
+                            note = " ".join(parts) if parts else f"這是第 {i} 頁投影片內容。"
+                        slide_texts.append(note)
+                except Exception as e:
+                    return f"❌ 讀取 PPTX 備忘錄失敗：{e}"
+            else:
+                return "⚠️ .ppt 格式需要已安裝 PowerPoint，建議另存為 .pptx 後再上傳。"
+        else:
+            return "⚠️ 不支援的檔案格式。只支援 .pptx, .ppt 與 .pdf。"
+
+        if not slide_texts:
+            return "⚠️ 無法解析投影片或 PDF 頁數。"
+
+        # Format as editable block: === 第 N 頁 === \n <text>
+        lines = []
+        for i, text in enumerate(slide_texts, 1):
+            lines.append(f"=== 第 {i} 頁 ===")
+            lines.append(text.strip())
+            lines.append("")  # blank line separator
+        return "\n".join(lines)
+    except Exception as e:
+        return f"❌ 擷取腳本失敗：{e}"
+
+
+def script_text_to_slides(script_text):
+    """Parse the editable script back into per-slide list."""
+    slides = []
+    current = []
+    for line in script_text.splitlines():
+        if line.strip().startswith("===") and line.strip().endswith("==="):
+            if current:
+                slides.append("\n".join(current).strip())
+                current = []
+        else:
+            current.append(line)
+    if current:
+        slides.append("\n".join(current).strip())
+    # Remove empty entries
+    slides = [s for s in slides if s]
+    return slides
+
+
+def auto_synthesize_presentation(pptx_file, voice_name, script_text, progress=gr.Progress()):
     if not pptx_file:
         return "⚠️ 請先上傳簡報/PDF 檔案。"
     if not voice_name:
         return "⚠️ 請先選擇克隆配音聲音。"
-        
+    if not script_text or not script_text.strip():
+        return "⚠️ 請先點擊「預覽腳本」，確認腳本內容後再生成。"
+
     try:
+
         base_name, ext = os.path.splitext(os.path.basename(pptx_file))
         ext = ext.lower()
         
@@ -537,25 +614,18 @@ def auto_synthesize_presentation(pptx_file, voice_name, progress=gr.Progress()):
         slides_tmp_dir = os.path.join(REPO_DIR, "output", f"slides_{base_name}")
         os.makedirs(slides_tmp_dir, exist_ok=True)
         
-        slide_texts = []
+        # --- 使用使用者確認/修改後的腳本，不重新擷取文字 ---
+        slide_texts = script_text_to_slides(script_text)
         png_files = []
-        
+
+        # 仍需從原始檔匯出 PNG 投影片圖片
         if ext == ".pdf":
-            progress(0, desc="正在讀取 PDF 檔案並擷取內文與頁面...")
+            progress(0, desc="正在讀取 PDF 檔案並匯出投影片圖片...")
             import fitz
             doc = fitz.open(pptx_file)
-            total_slides = len(doc)
-            
+            total_slides_file = len(doc)
             for i, page in enumerate(doc, 1):
-                progress((i / total_slides) * 0.15, desc=f"匯出第 {i}/{total_slides} 頁 PDF 為 PNG 並擷取文字...")
-                
-                # 擷取文字
-                text = page.get_text().strip()
-                if not text:
-                    text = f"這是第 {i} 頁 PDF 內容。"
-                slide_texts.append(text)
-                
-                # 匯出 PNG (使用 zoom=2 可以得到清晰的解析度)
+                progress((i / total_slides_file) * 0.15, desc=f"匯出第 {i}/{total_slides_file} 頁 PDF 為 PNG...")
                 zoom = 2
                 mat = fitz.Matrix(zoom, zoom)
                 pix = page.get_pixmap(matrix=mat, alpha=False)
@@ -563,91 +633,33 @@ def auto_synthesize_presentation(pptx_file, voice_name, progress=gr.Progress()):
                 out_png = os.path.join(slides_tmp_dir, png_name)
                 pix.save(out_png)
                 png_files.append(f"output/slides_{base_name}/{png_name}")
-                
+
         elif ext in [".pptx", ".ppt"]:
-            progress(0, desc="正在分析簡報投影片與備忘錄...")
+            progress(0, desc="正在匯出投影片圖片...")
             import win32com.client
             import pythoncom
-            
-            # 優先嘗試用 python-pptx 快速讀取投影片備忘錄 (僅支援 .pptx)
-            use_fast_notes = False
-            if ext == ".pptx":
-                try:
-                    from pptx import Presentation
-                    prs = Presentation(pptx_file)
-                    for i, slide in enumerate(prs.slides, 1):
-                        note = ""
-                        if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
-                            note = slide.notes_slide.notes_text_frame.text.strip()
-                        if not note:
-                            note = f"這是第 {i} 頁投影片內容。"
-                        slide_texts.append(note)
-                    use_fast_notes = True
-                except Exception as e:
-                    print(f"python-pptx 讀取備忘錄失敗，將使用 COM 進行讀取: {e}")
-                    slide_texts = []
-            
             pythoncom.CoInitialize()
             try:
-                app = win32com.client.Dispatch("PowerPoint.Application")
-                app.Visible = True
-                
-                prs_com = app.Presentations.Open(os.path.abspath(pptx_file), ReadOnly=True, Untitled=False, WithWindow=False)
-                total_slides = prs_com.Slides.Count
-                
-                for i in range(1, total_slides + 1):
-                    progress((i / total_slides) * 0.15, desc=f"匯出第 {i}/{total_slides} 頁投影片為 PNG...")
-                    # 匯出圖片
+                ppt_app = win32com.client.Dispatch("PowerPoint.Application")
+                ppt_app.Visible = True
+                prs_com = ppt_app.Presentations.Open(os.path.abspath(pptx_file), ReadOnly=True, Untitled=False, WithWindow=False)
+                total_slides_file = prs_com.Slides.Count
+                for i in range(1, total_slides_file + 1):
+                    progress((i / total_slides_file) * 0.15, desc=f"匯出第 {i}/{total_slides_file} 頁投影片為 PNG...")
                     png_name = f"slide_{i:03d}.png"
                     out_png = os.path.join(slides_tmp_dir, png_name)
                     prs_com.Slides(i).Export(out_png, "PNG", 1920, 1080)
                     png_files.append(f"output/slides_{base_name}/{png_name}")
-                    
-                    # 如果不能用 python-pptx 快速讀取備忘錄，則使用 COM 讀取
-                    if not use_fast_notes:
-                        slide = prs_com.Slides(i)
-                        note = ""
-                        if slide.HasNotesPage:
-                            for shape in slide.NotesPage.Shapes:
-                                if shape.HasTextFrame and shape.TextFrame.HasText:
-                                    try:
-                                        if shape.PlaceholderFormat.Type == 12: # ppPlaceholderNotesPageBody
-                                            note = shape.TextFrame.TextRange.Text.strip()
-                                            break
-                                    except Exception:
-                                        pass
-                            if not note:
-                                for shape in slide.NotesPage.Shapes:
-                                    if shape.HasTextFrame and shape.TextFrame.HasText:
-                                        try:
-                                            if shape.PlaceholderFormat.Type == 2: # ppPlaceholderBody
-                                                note = shape.TextFrame.TextRange.Text.strip()
-                                                break
-                                        except Exception:
-                                            pass
-                            if not note:
-                                candidate_texts = []
-                                for shape in slide.NotesPage.Shapes:
-                                    if shape.HasTextFrame and shape.TextFrame.HasText:
-                                        txt = shape.TextFrame.TextRange.Text.strip()
-                                        if len(txt) > 3:
-                                            candidate_texts.append(txt)
-                                if candidate_texts:
-                                    note = "\n".join(candidate_texts)
-                        if not note:
-                            note = f"這是第 {i} 頁投影片內容。"
-                        slide_texts.append(note)
-                
                 prs_com.Close()
-                app.Quit()
+                ppt_app.Quit()
             finally:
                 pythoncom.CoUninitialize()
         else:
             return "⚠️ 不支援的檔案格式。只支援 .pptx, .ppt 與 .pdf。"
-            
+
         total_slides = len(slide_texts)
         if total_slides == 0:
-            return "⚠️ 無法解析投影片或 PDF 頁數。"
+            return "⚠️ 腳本內容為空，請確認腳本格式正確（每頁以 === 第 N 頁 === 分隔）。"
             
         progress(0.15, desc=f"共 {total_slides} 頁。正在載入 VoxCPM2 語音模型...")
         
@@ -1072,27 +1084,41 @@ def build_ui():
             with gr.Tab("🏗️ 投影片自動合成"):
                 with gr.Column(elem_classes="step-box"):
                     gr.Markdown("## 1. 上傳簡報或 PDF 檔案 (.pptx, .ppt, .pdf)")
-                    gr.Markdown("💡 *系統將會自動擷取簡報底部的 **「備忘錄/備註 (Notes)」**（PPT/PPTX）或**頁面文字內容**（PDF）作為 AI 配音的逐字稿。*")
+                    gr.Markdown("💡 *系統將自動擷取 PPT/PPTX **備忘錄** 或 PDF **頁面文字** 作為配音腳本，您可在下方確認並修改後再生成。*")
                     pptx_upload = gr.File(label="上傳簡報/PDF 檔案", file_types=[".pptx", ".ppt", ".pdf"], type="filepath")
-                    
+                    extract_btn = gr.Button("📄 Step 1：預覽腳本", variant="secondary", size="lg")
+
                 with gr.Column(elem_classes="step-box"):
-                    gr.Markdown("## 2. 選擇克隆配音聲音")
+                    gr.Markdown("## 2. 確認並修改腳本")
+                    gr.Markdown("✏️ *每頁以 `=== 第 N 頁 ===` 分隔，您可以直接在下方文字框修改每頁的朗讀內容。*")
+                    script_preview = gr.Textbox(
+                        label="腳本內容（可直接編輯）",
+                        lines=20,
+                        interactive=True,
+                        placeholder="點擊上方「預覽腳本」後，腳本將會顯示在此處，您可以直接修改每頁文字後再按生成..."
+                    )
+
+                with gr.Column(elem_classes="step-box"):
+                    gr.Markdown("## 3. 選擇聲音並生成")
                     voice_dropdown_synth = gr.Dropdown(
-                        label="選擇聲音名稱",
+                        label="選擇克隆配音聲音",
                         choices=list_voices(),
                         value=list_voices()[0] if list_voices() else None,
                         interactive=True
                     )
-                    
-                with gr.Column(elem_classes="step-box"):
-                    gr.Markdown("## 3. 開始自動合成")
-                    synth_btn = gr.Button("⚡ 開始自動合成（語音 + 簡報）", variant="primary", size="lg")
-                    
+                    synth_btn = gr.Button("⚡ Step 2：確認腳本，開始合成語音 + 簡報", variant="primary", size="lg")
+
                 synth_result = gr.Textbox(label="合成日誌與結果", lines=12, interactive=False)
+
+                extract_btn.click(
+                    fn=extract_presentation_script,
+                    inputs=[pptx_upload],
+                    outputs=[script_preview]
+                )
 
                 synth_btn.click(
                     fn=auto_synthesize_presentation,
-                    inputs=[pptx_upload, voice_dropdown_synth],
+                    inputs=[pptx_upload, voice_dropdown_synth, script_preview],
                     outputs=[synth_result]
                 )
 
