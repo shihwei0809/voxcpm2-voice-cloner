@@ -8,6 +8,27 @@ app.py - VoxCPM2 語音錄製工具
 """
 
 import os
+import ssl
+# 繞過 urllib/urllib2 SSL 憑證驗證
+ssl._create_default_https_context = ssl._create_unverified_context
+
+# 繞過 requests 庫的 SSL 憑證驗證 (Hugging Face Hub 下載適用)
+try:
+    import requests
+    from urllib3.exceptions import InsecureRequestWarning
+    # 停用不安全請求警告
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    
+    # 覆寫 Session.request 強制將 verify 設為 False
+    old_request = requests.Session.request
+    def new_request(*args, **kwargs):
+        kwargs['verify'] = False
+        return old_request(*args, **kwargs)
+    requests.Session.request = new_request
+    print("已成功套用全域 SSL 憑證驗證繞過修正")
+except Exception as e:
+    print(f"無法套用 requests SSL 繞過修正: {e}")
+
 import numpy as np
 import gradio as gr
 import json
