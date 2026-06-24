@@ -99,8 +99,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "  PyTorch installation completed." -ForegroundColor Green
 
 # --- Step 5: Install voxcpm + sounddevice + resampy + presentation tools ---
-Write-Host '[5/6] Installing voxcpm, sounddevice, resampy, pymupdf, python-pptx, pywin32...' -ForegroundColor Yellow
-python -m uv pip install --python $venvPython voxcpm sounddevice resampy pymupdf python-pptx pywin32
+Write-Host '[5/6] Installing voxcpm, sounddevice, resampy, pymupdf, python-pptx, pywin32, edge-tts...' -ForegroundColor Yellow
+python -m uv pip install --python $venvPython voxcpm sounddevice resampy pymupdf python-pptx pywin32 edge-tts
 if ($LASTEXITCODE -ne 0) {
     Write-Host '  [Error] Failed to install required packages.' -ForegroundColor Red
     exit 1
