@@ -1,19 +1,18 @@
 @echo off
-chcp 65001 >nul
-title VoxCPM2 Voice Cloner - 啟動中...
+title VoxCPM2 Voice Cloner - Starting...
 cd /d "%~dp0"
 
-:: ========== 檢查是否已安裝 ==========
+:: ========== Check if installed ==========
 if not exist ".venv\Scripts\python.exe" (
     echo ========================================
-    echo   尚未安裝，請先雙擊 install.bat
+    echo   Not installed yet! Please double click install.bat first.
     echo ========================================
     echo.
     pause
     exit /b 1
 )
 
-:: ========== 檢查是否有已錄製的聲音 ==========
+:: ========== Check voices ==========
 if not exist "voices" (
     mkdir voices
 )
@@ -23,33 +22,33 @@ for /d %%d in (voices\*) do (
 )
 if %HAS_VOICE%==0 (
     echo ========================================
-    echo   尚未錄製聲音！
-    echo   請先在 app.py 中錄製你的參考音。
+    echo   No voices recorded yet!
+    echo   Please record your reference voice in the WebUI.
     echo ========================================
     echo.
 )
 
-:: ========== 關閉舊的伺服器（如果有的話） ==========
+:: ========== Close old server ==========
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr :7860') do (
     taskkill /f /pid %%a 2>nul
 )
 
-:: ========== 啟動伺服器 ==========
-echo 正在啟動 VoxCPM2 Voice Cloner...
+:: ========== Start server ==========
+echo Starting VoxCPM2 Voice Cloner...
 start "VoxCPM2 Server" ".venv\Scripts\python.exe" app.py
 
-:: ========== 等待伺服器啟動 ==========
-echo 等待伺服器啟動中...
+:: ========== Wait for server ==========
+echo Waiting for server to start...
 :wait
 ping 127.0.0.1 -n 2 >nul
 curl -s http://127.0.0.1:7860 >nul 2>&1
 if errorlevel 1 goto wait
 
-:: ========== 開啟瀏覽器 ==========
-echo 啟動完成！正在打開瀏覽器...
+:: ========== Open browser ==========
+echo Done! Opening browser...
 start http://127.0.0.1:7860
 
 echo.
-echo 視窗可以關閉，伺服器會在背景持續執行。
-echo 若要停止，按 Ctrl+C 或關閉「VoxCPM2 Server」視窗。
+echo You can close this window. The server will run in the background.
+echo To stop, press Ctrl+C or close the "VoxCPM2 Server" window.
 ping 127.0.0.1 -n 6 >nul

@@ -17,14 +17,18 @@ Write-Host ''
 # --- Step 1: Check uv ---
 Write-Host '[1/6] Checking uv package manager...' -ForegroundColor Yellow
 $uvExists = $false
-try {
-    $null = python -m uv --version
+$null = python -m uv --version 2>&1
+if ($LASTEXITCODE -eq 0) {
     $uvExists = $true
-} catch {}
+}
 
 if (-not $uvExists) {
     Write-Host '  uv is not installed, installing...' -ForegroundColor Yellow
-    pip install -U uv
+    python -m pip install -U uv
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host '  [Error] Failed to install uv via pip.' -ForegroundColor Red
+        exit 1
+    }
 } else {
     Write-Host "  uv is installed and accessible via 'python -m uv'." -ForegroundColor Green
 }
@@ -35,6 +39,10 @@ if (Test-Path $venvPython) {
     Write-Host "  $venvName already exists, skipping creation." -ForegroundColor Green
 } else {
     python -m uv venv --python 3.12 $venvName
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host '  [Error] Failed to create virtual environment.' -ForegroundColor Red
+        exit 1
+    }
     Write-Host "  venv created successfully: $venvName" -ForegroundColor Green
 }
 
@@ -84,11 +92,19 @@ if ($gpuType -eq 'xpu') {
 } else {
     python -m uv pip install --python $venvPython torch --index-url $torchIndex
 }
+if ($LASTEXITCODE -ne 0) {
+    Write-Host '  [Error] Failed to install PyTorch.' -ForegroundColor Red
+    exit 1
+}
 Write-Host "  PyTorch installation completed." -ForegroundColor Green
 
 # --- Step 5: Install voxcpm + sounddevice + resampy ---
 Write-Host '[5/6] Installing voxcpm + sounddevice + resampy...' -ForegroundColor Yellow
 python -m uv pip install --python $venvPython voxcpm sounddevice resampy
+if ($LASTEXITCODE -ne 0) {
+    Write-Host '  [Error] Failed to install voxcpm + sounddevice + resampy.' -ForegroundColor Red
+    exit 1
+}
 Write-Host "  voxcpm + sounddevice + resampy installation completed." -ForegroundColor Green
 
 # --- Step 6: XPU Auto patch ---
@@ -124,4 +140,5 @@ Write-Host '  2. Generate voice: .\.venv\Scripts\python.exe clone.py "your text 
 Write-Host ''
 
 # Store GPU type for other scripts
-[IO.File]::WriteAllText((Join-Path $PSScriptRoot '.gpu_type'), $gpuType)
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[IO.File]::WriteAllText((Join-Path $PSScriptRoot '.gpu_type'), $gpuType, $utf8NoBom)
