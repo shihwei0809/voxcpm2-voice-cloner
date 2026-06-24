@@ -40,3 +40,6 @@ Thumbs.db
 .env
 *.key
 credentials.*
+
+# 模型下載快取
+cache/

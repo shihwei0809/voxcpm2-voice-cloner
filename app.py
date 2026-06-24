@@ -8,10 +8,19 @@ app.py - VoxCPM2 語音錄製工具
 """
 
 import os
+REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 建立快取資料夾在 D 槽專案目錄下，避免佔用 C 槽空間
+cache_dir = os.path.join(REPO_DIR, "cache")
+os.makedirs(cache_dir, exist_ok=True)
+os.environ["HF_HOME"] = os.path.join(cache_dir, "huggingface")
+os.environ["MODELSCOPE_CACHE"] = os.path.join(cache_dir, "modelscope")
+
 # 設定 Hugging Face 鏡像站以加速下載並防止連線中斷
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 # 停用 Windows 符號連結警告
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+
 
 import ssl
 # 繞過 urllib/urllib2 SSL 憑證驗證
