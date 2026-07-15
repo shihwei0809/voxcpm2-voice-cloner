@@ -19,6 +19,53 @@ import argparse
 
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# Configure cache directories to load ModelScope model successfully
+cache_dir = os.path.join(REPO_DIR, "cache")
+os.makedirs(cache_dir, exist_ok=True)
+os.environ["HF_HOME"] = os.path.join(cache_dir, "huggingface")
+os.environ["MODELSCOPE_CACHE"] = os.path.join(cache_dir, "modelscope")
+
+# Bypass SSL certification verification for requests and httpx
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
+try:
+    import requests
+    old_request = requests.Session.request
+    def new_request(*args, **kwargs):
+        kwargs['verify'] = False
+        return old_request(*args, **kwargs)
+    requests.Session.request = new_request
+except Exception:
+    pass
+
+try:
+    import httpx
+    old_init = httpx.Client.__init__
+    def new_init(self, *args, **kwargs):
+        kwargs['verify'] = False
+        old_init(self, *args, **kwargs)
+    httpx.Client.__init__ = new_init
+except Exception:
+    pass
+
+# Redirect openbmb/VoxCPM2 snapshot download to ModelScope
+try:
+    import huggingface_hub
+    old_snapshot = huggingface_hub.snapshot_download
+    def patched_snapshot(*args, **kwargs):
+        repo_id = kwargs.get('repo_id') or (args[0] if args else None)
+        if repo_id == 'openbmb/VoxCPM2':
+            from modelscope.hub.snapshot_download import snapshot_download as ms_snapshot
+            ms_kwargs = {}
+            if 'revision' in kwargs:
+                ms_kwargs['revision'] = kwargs['revision']
+            return ms_snapshot(model_id=repo_id, **ms_kwargs)
+        return old_snapshot(*args, **kwargs)
+    huggingface_hub.snapshot_download = patched_snapshot
+except Exception:
+    pass
+
 def detect_device():
     """從 install.ps1 產生的 .gpu_type 讀取，或自動偵測。"""
     gpu_type_file = os.path.join(REPO_DIR, '.gpu_type')
